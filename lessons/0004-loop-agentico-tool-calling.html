@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 4 — O loop agêntico e o tool calling</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 1 · Fundamentos técnicos · Lição 4</p>
+  <h1>O loop agêntico e o tool calling</h1>
+  <p class="lede">Ainda <em>sem framework</em>: é aqui que um LLM "que só fala" vira um <strong>agente que age</strong>. E é aqui que nascem a maior parte dos bugs, custos e riscos de um sistema agêntico real — então vamos devagar e fundo.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> você está construindo um assistente bancário agêntico <em>em produção</em> sobre <strong>LangChain4j + Micronaut 5 + Java 25</strong>. O LangChain4j vai abstrair a mecânica de <em>tool calling</em> (Lição 7), mas se você não dominar o loop por baixo do capô, vai entregar um agente que inventa saldo ou move dinheiro errado. Esta lição é essa fundação.
+  </div>
+
+  <h2>1 · Relembrando o loop, agora a sério</h2>
+  <p>Na Lição 1 desenhamos o ciclo <strong>ReAct</strong> (<em>Reasoning + Acting</em> / Raciocinar + Agir): Pensar → Agir → Observar → repetir. Agora detalhamos o que <strong>realmente</strong> acontece, passo a passo, numa única pergunta do cliente:</p>
+
+<pre><code>            ┌───────────────────────────────────────────────┐
+            │  Cliente: "Qual minha fatura e meu saldo?"     │
+            └───────────────────────┬───────────────────────┘
+                                    ▼
+   (1) Você monta o prompt: system + DESCRIÇÕES DAS TOOLS + histórico + pergunta
+                                    ▼
+   (2) Chama o modelo  ───────────────────────────────►  MODELO
+                                    ◄───────────────────────────────
+   (3) Resposta do modelo é UMA de duas coisas:
+        (a) texto final  → ACABOU, responde ao cliente
+        (b) PEDIDO(S) de tool: getFatura(), getSaldo()  → continua
+                                    ▼
+   (4) SEU CÓDIGO valida → autoriza → executa as tools (backends do banco)
+                                    ▼
+   (5) Você anexa os RESULTADOS como novas mensagens na lista
+                                    ▼
+   (6) Volta ao passo (2) com a lista atualizada  ↺  (até o modelo dar texto final)</code></pre>
+
+  <p>O ponto que quase todo iniciante erra: <strong>o "loop" não é do modelo — é seu.</strong> O modelo é uma função sem estado (Lição 1) que você chama repetidamente. <strong>Você</strong> decide quando parar, valida cada passo e controla o que entra na mesa.</p>
+
+  <h2>2 · O protocolo de <em>function calling</em>, por baixo do capô</h2>
+  <p>"Tool calling" (ou "function calling" / chamada de ferramenta) é um <strong>protocolo</strong>. Os nomes exatos no fio (<em>wire format</em> / formato de transmissão) mudam por provedor (OpenAI usa <code>tool_calls</code>, Anthropic usa blocos <code>tool_use</code>), mas a estrutura é universal — e o LangChain4j vai abstrair tudo isso pra você (Lição 7). A mecânica:</p>
+
+  <p><strong>Passo A — você declara as ferramentas.</strong> Cada tool é descrita por: um <strong>nome</strong>, uma <strong>descrição</strong> em linguagem natural e um <strong>esquema de parâmetros</strong> (JSON Schema). Exemplo (formato neutro):</p>
+
+<pre><code>{
+  "name": "getFaturaCartao",
+  "description": "Retorna a fatura atual do cartão de crédito do cliente autenticado.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "mesReferencia": { "type": "string", "description": "Mês no formato YYYY-MM. Opcional; padrão = mês atual." }
+    },
+    "required": []
+  }
+}</code></pre>
+
+  <p><strong>Passo B — o modelo responde com um pedido estruturado</strong> (não com texto):</p>
+
+<pre><code>{ "tool_calls": [ { "name": "getFaturaCartao", "arguments": { "mesReferencia": "2026-06" } } ] }</code></pre>
+
+  <p><strong>Passo C — seu código executa e devolve o resultado como mensagem <code>tool</code>:</strong></p>
+
+<pre><code>{ "role": "tool", "name": "getFaturaCartao",
+  "content": { "valor": 2310.55, "vencimento": "2026-06-20", "status": "ABERTA" } }</code></pre>
+
+  <p><strong>Passo D — você chama o modelo de novo</strong>, agora com a fatura na mesa, e ele redige a resposta final em pt-BR.</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Conexão com a Lição 2:</strong> as <strong>descrições das tools são enviadas em TODA chamada</strong> — elas vivem na janela de contexto. Um banco com dezenas de produtos pode ter dezenas de tools; isso é um custo fixo recorrente enorme. (Lembra do aprofundamento de tokenização? É por isso que descrições de tools em <strong>inglês</strong> economizam tanto.)</p>
+  </blockquote>
+
+  <h2>3 · Como o modelo "decide" chamar uma tool</h2>
+  <p>Aqui está a verdade desconfortável: <strong>ele não "decide" no sentido humano.</strong> Continua sendo predição do próximo token (Lição 1). Os modelos são <strong>treinados/ajustados</strong> para emitir tokens de "pedido de ferramenta" quando o contexto sugere que uma ferramenta é útil. A "decisão" é <strong>probabilística</strong>, condicionada principalmente por:</p>
+  <ol>
+    <li><strong>O nome e a descrição da tool</strong> (é o que o modelo "lê" para saber que ela existe e para que serve).</li>
+    <li><strong>A mensagem do usuário</strong> e o histórico.</li>
+    <li><strong>O system prompt</strong> (que pode reforçar "sempre use ferramentas para dados de conta").</li>
+  </ol>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>A qualidade da "decisão" do agente é, em grande parte, a qualidade das suas descrições de ferramentas.</strong> Se <code>getSaldoContaGlobal</code> e <code>getSaldoContaNacional</code> têm descrições vagas ou parecidas, o modelo vai confundir qual chamar — e mostrar o saldo da conta errada. No mundo real, <strong>a maior parte do "tuning" de um agente não é mexer no modelo: é reescrever nomes e descrições de tools</strong> até a decisão ficar confiável. Isso é a Lição 7 inteira, e começa aqui.</p>
+  </blockquote>
+
+  <h2>4 · Chamadas paralelas vs. sequenciais</h2>
+  <p>Modelos modernos podem pedir <strong>várias tools de uma vez</strong> (paralelo) ou <strong>encadear</strong> (sequencial):</p>
+  <ul>
+    <li><strong>Paralelo</strong> — as tools são independentes. <em>"Qual minha fatura e meu saldo?"</em> → <code>getFatura()</code> <strong>e</strong> <code>getSaldo()</code> no mesmo passo. Seu código pode executá-las concorrentemente (guarde isso para a Lição 13: <em>virtual threads</em> / threads virtuais e <em>structured concurrency</em> / concorrência estruturada do Java 25 brilham exatamente aqui).</li>
+    <li><strong>Sequencial</strong> — o resultado de uma alimenta a próxima. <em>"Mostre o extrato da conta onde caiu meu salário"</em> → <code>descobrirContaSalario()</code> → e <strong>só então</strong> <code>getExtrato(contaId)</code>. O modelo precisa do primeiro resultado antes de formular o segundo pedido. Isso significa <strong>mais viagens ao modelo</strong> → mais latência (Lição 2).</li>
+  </ul>
+
+  <h2>5 · Os modos de falha (a parte do "mundo real")</h2>
+  <p>É aqui que sistemas agênticos quebram em produção. Cada falha tem um nome e uma defesa:</p>
+  <table>
+    <thead><tr><th>Falha</th><th>O que é</th><th>No banco</th><th>Defesa</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Sub-chamada (<em>under-calling</em>)</strong></td>
+        <td>O modelo <strong>não</strong> chama a tool e responde da "memória" (que é nula/desatualizada)</td>
+        <td>Inventa um saldo em vez de consultar → <strong>catastrófico</strong></td>
+        <td>System prompt forte + nunca confiar em dado factual sem tool; validação de saída (Lição 11)</td>
+      </tr>
+      <tr>
+        <td><strong>Alucinação de ferramenta</strong></td>
+        <td>Pede uma tool que <strong>não existe</strong></td>
+        <td>Chama <code>getLimitePix</code> quando só existe <code>getPix</code></td>
+        <td>Seu código rejeita tools desconhecidas e devolve erro ao modelo</td>
+      </tr>
+      <tr>
+        <td><strong>Alucinação de argumento</strong></td>
+        <td>Inventa valores/parâmetros</td>
+        <td>Passa um <code>clienteId</code> inventado, ou <code>mesReferencia: "2026-13"</code></td>
+        <td>Validação de esquema + regras de negócio <strong>antes</strong> de executar</td>
+      </tr>
+      <tr>
+        <td><strong>Sobre-chamada (<em>over-calling</em>)</strong></td>
+        <td>Chama tools desnecessárias</td>
+        <td>Consulta 5 backends para um "oi"</td>
+        <td>Boas descrições; o modelo aprende quando <em>não</em> agir</td>
+      </tr>
+      <tr>
+        <td><strong>Loop infinito</strong></td>
+        <td>Continua chamando tools sem convergir</td>
+        <td>Reconsulta a fatura 20 vezes</td>
+        <td><strong>Teto de iterações</strong> (você impõe), detecção de repetição</td>
+      </tr>
+      <tr>
+        <td><strong>Entidade errada</strong></td>
+        <td>Usa o ID/contexto de outra pessoa</td>
+        <td>Mostra a conta do cliente 999</td>
+        <td><strong>Vínculo de identidade no servidor</strong> (ver Seção 6) — nunca deixar o modelo fornecer a identidade</td>
+      </tr>
+      <tr>
+        <td><strong>Caminho infeliz não tratado</strong></td>
+        <td>A tool falha (timeout, erro, vazio) e o loop não sabe lidar</td>
+        <td>Backend da conta global fora do ar</td>
+        <td>Devolver o <strong>erro como resultado de tool</strong> para o modelo reagir; <em>fallback</em>/escalonamento</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <strong>⚠️ A sub-chamada é a mais perigosa num banco.</strong> Um modelo que "acha" que sabe o saldo e responde sem consultar produz uma resposta <strong>confiante e errada</strong> sobre dinheiro. A defesa é cultural e técnica: o agente é instruído a tratar <strong>todo</strong> dado factual de conta como algo que <em>só</em> pode vir de tool, e a saída é validada.
+  </div>
+
+  <h2>6 · O loop de controle é SEU (e onde ficam as travas)</h2>
+  <p>O modelo propõe; <strong>o seu código dispõe</strong>. Entre o passo (3) e o (4) do fluxo, há uma camada determinística que você controla:</p>
+  <ol>
+    <li><strong>Validação de esquema</strong> — os argumentos batem com o JSON Schema? Tipos certos, campos obrigatórios presentes?</li>
+    <li><strong>Regras de negócio</strong> — <code>mesReferencia</code> não pode ser futuro; valor de Pix dentro do limite; etc.</li>
+    <li><strong>Autorização</strong> — este cliente pode acessar esta conta/produto? (Determinístico, nunca delegado ao modelo.)</li>
+    <li><strong>Teto de iterações e <em>timeouts</em></strong> — máximo de N passos; tempo máximo por tool e por turno.</li>
+    <li><strong>Idempotência</strong> — para ações que mudam estado (Lição 14).</li>
+    <li><strong>Observabilidade</strong> — registrar cada passo (Lição 17).</li>
+  </ol>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight (o mais importante do módulo) —</span> <strong>Parâmetros de identidade/segurança NÃO vêm do modelo — vêm do seu contexto de sessão autenticado.</strong> Note que, na Seção 2, a tool <code>getFaturaCartao</code> <strong>não tem</strong> um parâmetro <code>clienteId</code>. Isso é proposital. O <code>clienteId</code> é injetado pelo <strong>seu código</strong>, a partir do <em>token</em> de sessão autenticado, <em>depois</em> que o modelo pede a tool. O modelo só fornece a <strong>intenção</strong> (qual produto, qual mês) — nunca <strong>quem é o cliente</strong>. Por quê? Porque o modelo pode ser <strong>enganado</strong> (prompt injection, Lição 15) a passar o ID de outra pessoa. Se a identidade nunca está nas mãos do modelo, esse ataque morre na fundação. Regra de ouro: <strong>o modelo carrega intenção; o servidor carrega identidade e autorização.</strong></p>
+  </blockquote>
+
+  <h2>7 · Tools de leitura vs. tools de ação (a distinção que salva bancos)</h2>
+  <p>Nem toda ferramenta é igual:</p>
+  <ul>
+    <li><strong>Tools de leitura</strong> (<code>getSaldo</code>, <code>getFatura</code>, <code>getExtrato</code>): consultam, são (idealmente) idempotentes e seguras. Podem ser executadas automaticamente quando o modelo pede.</li>
+    <li><strong>Tools de ação / escrita</strong> (<code>fazerPix</code>, <code>agendarPagamento</code>, <code>contratarFinanciamento</code>): <strong>movem dinheiro ou mudam estado</strong>. Estas <strong>não podem</strong> ser executadas só porque o modelo pediu.</li>
+  </ul>
+  <p>Para tools de ação, o fluxo ganha travas extras (detalhadas na Lição 14): <strong>confirmação explícita do usuário</strong>, <strong>idempotência</strong> (para não pagar o boleto duas vezes se o loop repetir), <strong>autorização reforçada</strong> e, às vezes, <strong>humano no circuito</strong> (<em>human-in-the-loop</em> / humano no circuito).</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> Princípio: <strong>leitura o agente pode propor e executar; ação o agente só pode <em>propor</em> — a execução exige uma porta determinística com confirmação.</strong></p>
+  </blockquote>
+
+  <h2>8 · Um trace detalhado (a lista de mensagens crescendo)</h2>
+  <p>Cliente: <em>"Mostre o extrato da conta onde caiu meu salário e veja se já posso pagar a fatura."</em> Acompanhe a <strong>lista de mensagens</strong> (a "mesa") evoluindo:</p>
+
+<pre><code>[1] system:    "Você é o assistente do Banco X... use tools para dados de conta..."
+[2] user:      "Mostre o extrato da conta do salário e se posso pagar a fatura."
+       │  → chamada 1 ao modelo
+[3] assistant: tool_calls: [ descobrirContaSalario() ]            (sequencial: precisa do ID antes)
+[4] tool:      descobrirContaSalario() -> { contaId: "NAC-771" }
+       │  → chamada 2 ao modelo
+[5] assistant: tool_calls: [ getExtrato("NAC-771"), getFaturaCartao() ]   (agora paralelo)
+[6] tool:      getExtrato -> { ...lançamentos... }
+[7] tool:      getFaturaCartao -> { valor: 2310.55, vencimento: "2026-06-20" }
+       │  → chamada 3 ao modelo
+[8] assistant: "Seu salário caiu na conta NAC-771. O extrato mostra saldo de R$ 4.800.
+                Sua fatura é R$ 2.310,55 (vence 20/06) — você tem saldo para pagá-la."  ← TEXTO FINAL</code></pre>
+
+  <p>Três viagens ao modelo, quatro execuções de tool, a mesa crescendo a cada passo. Note como <strong>custo e latência (Lição 2) se acumulam</strong> a cada ida — e por que, na Parte 3, vamos querer executar <code>[5]</code> em paralelo com <em>virtual threads</em>.</p>
+
+  <h2>9 · ReAct "clássico" vs. <em>function calling</em> nativo (evolução)</h2>
+  <p>Vale saber a história, porque você verá os dois nomes:</p>
+  <ul>
+    <li><strong>ReAct clássico (2022):</strong> convencia-se o modelo, <strong>via prompt</strong>, a escrever texto no formato <code>Thought: ... / Action: ... / Observation: ...</code>, e o código <strong>fazia <em>parsing</em> desse texto</strong>. Frágil: o modelo errava o formato, e o <em>parsing</em> quebrava.</li>
+    <li><strong><em>Function calling</em> nativo (hoje):</strong> o modelo foi <strong>treinado</strong> para emitir os pedidos de tool de forma <strong>estruturada</strong> (JSON), sem depender de <em>parsing</em> de texto livre. Muito mais confiável.</li>
+  </ul>
+  <p>O LangChain4j usa o mecanismo nativo quando o provedor suporta. A ideia conceitual (Pensar→Agir→Observar) é a mesma; a <strong>implementação</strong> evoluiu de "parsear texto" para "receber estrutura".</p>
+
+  <h2>10 · Prévia: um agente ou vários?</h2>
+  <p>Tudo acima descreve <strong>um</strong> agente com várias tools. Para sistemas grandes (como um banco com produtos muito distintos), surge a pergunta: um agente gigante com 40 tools, ou <strong>vários agentes especializados</strong> (um para cartões, um para investimentos, um para Pix) coordenados por um <strong>orquestrador/supervisor</strong>? Cada abordagem tem custos e riscos próprios. Isso é a arquitetura da Lição 14 — por ora, guarde que <strong>"mais tools na mesma mesa" piora a decisão e o custo</strong>, e que dividir para conquistar é uma ferramenta de design.</p>
+
+  <h2>11 · Glossário-resumo</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Em uma frase</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Function calling / Tool calling</strong></td><td>Protocolo onde o modelo emite pedidos estruturados de ferramenta.</td></tr>
+      <tr><td><strong>Tool definition</strong></td><td>Nome + descrição + JSON Schema dos parâmetros.</td></tr>
+      <tr><td><strong>tool_call / tool_result</strong></td><td>O pedido do modelo / o resultado que seu código devolve.</td></tr>
+      <tr><td><strong>Chamada paralela / sequencial</strong></td><td>Várias tools de uma vez / encadeadas (uma depende da outra).</td></tr>
+      <tr><td><strong>Under-calling / Over-calling</strong></td><td>Não chamar quando deveria / chamar à toa.</td></tr>
+      <tr><td><strong>Alucinação de tool/argumento</strong></td><td>Inventar ferramenta inexistente / valores inválidos.</td></tr>
+      <tr><td><strong>Teto de iterações</strong></td><td>Limite de passos que <strong>você</strong> impõe ao loop.</td></tr>
+      <tr><td><strong>Tool de leitura vs. de ação</strong></td><td>Consulta segura vs. operação que muda estado/dinheiro.</td></tr>
+      <tr><td><strong>Vínculo de identidade no servidor</strong></td><td>Identidade/autz vêm da sessão, nunca do modelo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por que dizemos que "o loop é seu, não do modelo"?</p>
+      <button class="opt" data-k="a">Porque o modelo guarda estado e repete as chamadas sozinho até concluir</button>
+      <button class="opt" data-k="b">Porque o modelo é sem estado e seu código é quem repete, valida e para</button>
+      <button class="opt" data-k="c">Porque o provedor executa o loop num ambiente isolado e devolve o texto</button>
+      <p class="explain">O modelo é uma função sem estado; você o chama repetidamente, valida cada passo e decide quando parar.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Por que <code>getFaturaCartao</code> não recebe <code>clienteId</code> como parâmetro?</p>
+      <button class="opt" data-k="a">Porque o JSON Schema não aceita identificadores de cliente como string</button>
+      <button class="opt" data-k="b">Porque o modelo já memoriza o cliente do turno anterior da conversa</button>
+      <button class="opt" data-k="c">Porque a identidade vem da sessão autenticada, fora do alcance do modelo</button>
+      <p class="explain">O modelo carrega intenção; o servidor injeta a identidade a partir do token — assim o prompt injection morre na fundação.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Qual modo de falha é o mais perigoso num banco, e por quê?</p>
+      <button class="opt" data-k="a">A sub-chamada, pois o modelo inventa um dado factual sem consultar a tool</button>
+      <button class="opt" data-k="b">A sobre-chamada, pois o modelo consulta backends demais e gera custo alto</button>
+      <button class="opt" data-k="c">O loop infinito, pois o modelo reconsulta a fatura e nunca dá texto final</button>
+      <p class="explain">A sub-chamada (under-calling) produz uma resposta confiante e errada sobre dinheiro; a defesa é nunca confiar em dado factual sem tool.</p>
+    </div>
+  </div>
+
+  <h2>Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>. A referência canônica sobre o que é (e o que não é) o loop agêntico, quando ele se justifica, e por que o controle do loop — não o modelo — é o que separa um agente confiável de um castelo de areia. Lê em poucos minutos e ancora cada decisão desta lição. Termos canônicos deste workspace: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (por que a identidade nunca pode vir do modelo? como um erro de backend "entra" no loop? quando dividir um agente em vários?), me pergunte e eu aprofundo ou crio um exercício sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0003-tokenizacao-ptbr.html">← 3 · Tokenização pt-BR</a>
+      <a href="0005-rag.html">5 · RAG →</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 4 de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-03-loop-agentico-tool-calling.md">curso/modulo-03-loop-agentico-tool-calling</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

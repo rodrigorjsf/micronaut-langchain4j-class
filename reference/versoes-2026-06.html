@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referência de versões (verificada 2026-06)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Referência · Cartão de consulta · pt-BR</p>
+  <h1>Referência de versões (verificada 2026-06)</h1>
+  <p class="lede">Versões confirmadas em <strong>fonte primária</strong> por busca direta, para a Parte 2+ assentar sobre rocha. Cada fato traz a fonte — reverifique antes de iniciar um projeto real, porque versões mudam.</p>
+  <p class="fine">Verificação original: <strong>2026-06-14</strong>. Cartão de referência denso e imprimível; não é um módulo da trilha.</p>
+
+  <h2>Confirmado</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Versão / Status</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>LangChain4j</strong> (standalone, estável)</td>
+        <td><strong>1.16.2</strong></td>
+        <td><a href="https://central.sonatype.com/artifact/dev.langchain4j/langchain4j">Maven Central</a></td>
+      </tr>
+      <tr>
+        <td><strong>LangChain4j</strong> — JDK mínimo</td>
+        <td><strong>Java 17</strong></td>
+        <td>docs/comunidade</td>
+      </tr>
+      <tr>
+        <td><strong>LangChain4j</strong> — versionamento</td>
+        <td>Duplo: trilha <strong>estável</strong> (<code>1.16.x</code>) + trilha <strong>beta</strong> (<code>1.x-betaNN</code>) para módulos novos; <strong>use o <code>langchain4j-bom</code></strong> e não fixe versões à mão</td>
+        <td>docs do BOM</td>
+      </tr>
+      <tr>
+        <td><strong>Micronaut Framework</strong></td>
+        <td><strong>5.0.0 GA em 2026-05-20</strong> (baseline Java 25, GraalVM 25.0.3, Groovy 5, Kotlin 2.3)</td>
+        <td><a href="https://micronaut.io/2026/05/20/micronaut-framework-5-0-0-released/">micronaut.io</a>, <a href="https://micronaut.io/2026/04/27/micronaut-framework-5-0-with-java-25-baseline/">Java 25 baseline</a></td>
+      </tr>
+      <tr>
+        <td><strong>micronaut-langchain4j</strong> (módulo de integração)</td>
+        <td><strong>2.0.1</strong> (compilação por <em>annotation processor</em> <code>micronaut-langchain4j-processor</code>)</td>
+        <td><a href="https://micronaut-projects.github.io/micronaut-langchain4j/latest/guide/">Guia oficial</a></td>
+      </tr>
+      <tr>
+        <td><strong>Java / JDK 25</strong></td>
+        <td><strong>GA em 2025-09-16, LTS</strong> (sucede o 21)</td>
+        <td><a href="https://www.infoq.com/news/2025/09/java25-released">InfoQ</a></td>
+      </tr>
+      <tr>
+        <td><strong>LangChain4j — "não é port do Python"</strong></td>
+        <td>Confirmado verbatim: <em>"Despite the name, LangChain4j is not a Java port of LangChain (Python) — it is built for Java, not ported to it."</em></td>
+        <td><a href="https://docs.langchain4j.dev/intro">docs.langchain4j.dev/intro</a></td>
+      </tr>
+      <tr>
+        <td><strong>langgraph4j</strong></td>
+        <td>Projeto <strong>terceiro/comunidade</strong> (org <code>langgraph4j</code>, separada da <code>langchain4j</code>); funciona com LangChain4j e Spring AI</td>
+        <td><a href="https://github.com/langgraph4j/langgraph4j">github.com/langgraph4j/langgraph4j</a></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Java 25 — Project Loom: o detalhe que muda decisões de produção</h2>
+  <p>Esta é a <strong>correção</strong> mais importante sobre o relatório inicial, que tratava tudo como "pronto para uso":</p>
+  <table>
+    <thead><tr><th>Recurso</th><th>Status no JDK 25</th><th>Implicação</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Virtual Threads</strong> (<em>threads</em> virtuais)</td>
+        <td><strong>FINAL</strong> (desde o JDK 21)</td>
+        <td>Pode usar em produção sem flags.</td>
+      </tr>
+      <tr>
+        <td><strong>Scoped Values</strong> (valores com escopo)</td>
+        <td><strong>FINAL</strong> — JEP 506</td>
+        <td>Pode usar em produção sem flags.</td>
+      </tr>
+      <tr>
+        <td><strong>Structured Concurrency</strong> (concorrência estruturada)</td>
+        <td><strong>AINDA EM <em>PREVIEW</em></strong> — JEP 505 (5º <em>preview</em>)</td>
+        <td>Requer <code>--enable-preview</code>; <strong>API ainda muda entre versões</strong>. Use com consciência do risco; não é GA.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="fine">Fontes: <a href="https://www.infoworld.com/article/3846172/jdk-25-the-new-features-in-java-25.html">InfoWorld — JDK 25</a>, <a href="https://inside.java/2025/10/20/jdk-25-performance-improvements/">Inside.java</a>, <a href="https://www.jrebel.com/blog/java-25">JRebel — Java 25</a>.</p>
+
+  <div class="warn">
+    <strong>Structured Concurrency não é GA.</strong> A API <strong>ainda muda entre versões</strong> e exige <code>--enable-preview</code> (JEP 505, 5º <em>preview</em>). Adote só com decisão consciente — flag mais risco de quebra entre releases.
+  </div>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Por que isso importa no banco —</span> no Módulo 3 vimos que chamadas de tool paralelas pedem concorrência. <em>Virtual Threads</em> e <em>Scoped Values</em> (ambos <strong>finais</strong>) já resolvem a maior parte com segurança. <em>Structured Concurrency</em> é a API mais elegante para "dispare N tools, junte os resultados, cancele todas se uma falhar" — mas, sendo <strong>preview</strong>, exige decisão consciente (flag + risco de mudança de API). Detalhamos no Módulo 11.</p>
+  </blockquote>
+
+  <h2>A verificar no momento certo (Módulo 10)</h2>
+  <table>
+    <thead><tr><th>Item</th><th>O que falta</th><th>Por quê</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>LangChain4j <strong>embutido</strong> no <code>micronaut-langchain4j 2.0.1</code></td>
+        <td>O guia não declara a versão exata; indícios apontam para a trilha <code>1.14.x</code> (atrás do standalone <code>1.16.2</code>)</td>
+        <td>A integração costuma seguir <strong>atrás</strong> do standalone; confirmar no <code>pom</code>/catálogo ao montar o projeto</td>
+      </tr>
+      <tr>
+        <td>Módulo <strong>agêntico</strong> do LangChain4j (<code>langchain4j-agentic</code> / <code>AgenticServices</code>)</td>
+        <td>O <code>intro</code> lista "Agents and Agentic AI", mas não confirmei o nome exato do módulo/classe</td>
+        <td>Confirmar ao chegar na orquestração de agentes (Módulos 12/17)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Princípio</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Princípio —</span> <strong>Nada nesta trilha sobre LangChain4j/Micronaut/Java é ensinado como fato sem uma destas linhas confirmadas — ou um aviso explícito de que está pendente de verificação.</strong> É o Foundation First aplicado a versões.</p>
+  </blockquote>
+
+  <footer>
+    <p class="fine">Cartão de referência · workspace <code>/teach</code> · pt-BR · Foundation First · verificado em 2026-06-14. Fonte-rascunho: <a href="../curso/referencia-versoes-2026-06.md">curso/referencia-versoes-2026-06.md</a>. Termos canônicos: <a href="glossary.html">glossary.html</a>.</p>
+  </footer>
+
+</div>
+</body>
+</html>

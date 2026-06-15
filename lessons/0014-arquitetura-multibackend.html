@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 14 — Arquitetura multi-backend do banco: agêntica, HITL e idempotência</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 3 · Micronaut 5 + Java 25 · Lição 14</p>
+  <h1>Arquitetura multi-backend do banco: agêntica, HITL e idempotência</h1>
+  <p class="lede">O banco tem vários backends (conta nacional, global, cartão, investimentos) e operações que <strong>movem dinheiro</strong>. Esta lição mostra como <strong>compor</strong> isso com o módulo agêntico — e, sobretudo, <strong>onde o framework não te ajuda</strong> (e por que isso é o certo).</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> orquestrar múltiplos backends e fluxos de confirmação é o coração do assistente bancário. O módulo agêntico do LangChain4j dá os blocos de composição — mas a <strong>segurança de mover dinheiro</strong> (idempotência, confirmação) continua sendo <strong>sua</strong>, na camada determinística. Confundir isso é caro.
+  </div>
+
+  <h2>1 · O módulo agêntico (e a armadilha de versão)</h2>
+  <div class="warn">
+    <strong>Verificado no Maven Central:</strong> o módulo é publicado <strong>só</strong> como <strong><code>dev.langchain4j:langchain4j-agentic:1.16.2-beta26</code></strong> — <strong>não existe</strong> um <code>1.16.2</code> puro (a tag git serve o código, mas não há artefato). Já o <code>langchain4j-bedrock</code> é <strong>release puro 1.16.2</strong>. No mesmo build, <strong>versões diferentes</strong>: <code>bedrock=1.16.2</code>, <code>agentic=1.16.2-beta26</code>. O <code>-beta</code> sinaliza <strong>API instável</strong> — fixe a versão exata.
+  </div>
+  <p><code>AgenticServices</code> (<code>public class</code>, não <code>final</code>) é o ponto de entrada, com fábricas estáticas: <code>sequenceBuilder()</code>, <code>parallelBuilder()</code>, <code>loopBuilder()</code>, <code>conditionalBuilder()</code>, <code>supervisorBuilder()</code>, <code>plannerBuilder()</code>, <code>humanInTheLoopBuilder()</code>, e <code>createAgenticSystem(Class[, ChatModel][, AgentConfigurator])</code>.</p>
+
+  <h2>2 · O seam para o Bedrock + <code>@Agent</code> vs <code>@V</code>/<code>@P</code></h2>
+  <p>As sobrecargas que recebem <code>ChatModel</code> são o <strong>encaixe</strong> do <code>BedrockChatModel</code> (que <code>implements ChatModel</code>) — Claude via Bedrock, sem SDK Anthropic direto.</p>
+  <blockquote class="insight">
+    <p><span class="star">★ Pegadinha de ensino —</span> a <strong>interface do agente</strong> usa <strong><code>@V</code></strong> (lê variáveis do <code>AgenticScope</code> — saídas de agentes anteriores): <code>@Agent("...") String withdraw(@V("user") String u, @V("amount") Double a)</code>. A <strong>classe de tool</strong> usa <strong><code>@P</code></strong> (descreve parâmetros da <code>@Tool</code> para o modelo): <code>@Tool("...") Double withdraw(@P("user name") String u, @P("amount") Double a)</code>. Trocar um pelo outro não funciona como esperado.</p>
+  </blockquote>
+
+  <h2>3 · Human-in-the-loop: genérico, sem semântica de dinheiro</h2>
+  <p>Duas formas: a anotação <strong><code>@HumanInTheLoop</code></strong> (declarativa) e o <strong>record <code>HumanInTheLoop</code></strong> (programática). Ambas são um mecanismo <strong>genérico</strong> de "perguntar ao usuário" — <strong>não há semântica de 'confirmação de dinheiro' embutida</strong>.</p>
+  <div class="warn">
+    O portão approve/deny é o <strong>seu</strong> <code>responseProvider</code>, que em produção precisa carregar o <strong>contexto da operação</strong> (valor, contas origem/destino, idempotency key) para uma decisão informada. O exemplo de 1 argumento do tutorial é didaticamente ingênuo — não o copie para produção.
+  </div>
+
+  <h2>4 · Idempotência + confirmação = ARQUITETURA, não API (a joia)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>O framework não tem primitivo de idempotência nem de confirmação de dinheiro</strong> (grep exaustivo nos 141 arquivos do <code>langchain4j-agentic</code> 1.16.2: zero ocorrências de "idempoten"; só literais de exemplo <code>"user-approval"</code>/<code>"approved"</code> em javadoc). E isso é <strong>correto</strong>: mover dinheiro com segurança é responsabilidade <strong>determinística</strong> da sua camada de tool/backend — <strong>dedupe por <code>transferId</code>/idempotency key</strong>, e o gate de confirmação na sua lógica (a <code>LoopAgentService.exitCondition</code> serve de porta determinística de "retry-até-aprovar"). O tema de sempre: <strong>o modelo decide e sugere; o seu código valida, autoriza e efetiva</strong> (Lições 1, 9, 11).</p>
+  </blockquote>
+
+  <h2>5 · Nacional vs. global: suas tools, seu roteamento</h2>
+  <p>Nada no módulo agêntico endereça o split nacional/global — modele como <strong>tools distintas</strong> (uma fala com cada backend) ou roteie com <code>conditionalBuilder</code>/<code>supervisorBuilder</code>. O paralelismo de leitura entra via <code>parallelBuilder</code> (ou o <code>executeToolsConcurrently</code> da Lição 13).</p>
+
+  <h2>6 · Esboço (com a assimetria de versão)</h2>
+  <pre><code>// bedrock = 1.16.2 (release)  |  agentic = 1.16.2-beta26 (experimental) — versões DIFERENTES no build
+ChatModel claudeViaBedrock = BedrockChatModel.builder()
+        .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0").region(Region.US_EAST_1).build();
+
+class BankTool {                                  // @Tool usa @P; idempotência é SUA
+    @Tool("Withdraw amount for a user; returns new balance")
+    Double withdraw(@P("user name") String user, @P("amount") Double amount) {
+        // escolhe backend nacional vs global; aplica dedupe por idempotency key
+        return /* novo saldo */ 0.0;
+    }
+}
+
+interface BankAgent {                             // interface de agente usa @V
+    @Agent("A banker that withdraws from an account")
+    String withdraw(@V("user") String user, @V("amount") Double amount);
+
+    @HumanInTheLoop(description = "Confirm money-moving operation", outputKey = "approval")
+    String confirm(@V("user") String user, @V("amount") Double amount);
+}
+
+BankAgent bank = AgenticServices.createAgenticSystem(BankAgent.class, claudeViaBedrock);</code></pre>
+
+  <div class="warn">
+    <strong>★ Esboço de anotações — NÃO auto-compõe —</strong> <code>createAgenticSystem</code> sobre dois métodos <code>@Agent</code> <strong>soltos</strong> (sem anotação de orquestração) <strong>não impõe ordem</strong>: aqui <code>confirm</code> <strong>não</strong> "trava" <code>withdraw</code>. Para ordenar, declare a composição explícita — <code>AgenticServices.sequenceBuilder()</code> ou a anotação <code>@SequenceAgent</code> (ambas verificadas em 1.16.2). E o <strong>portão que de fato protege o dinheiro</strong> (aprovar/negar) é a <strong>sua</strong> camada determinística: o <code>responseProvider</code> do HITL (seção 3) carregando o contexto da operação <strong>mais</strong> o dedupe por idempotency key na tool (seção 4) — porque o HITL é um "perguntar" genérico, sem semântica de dinheiro embutida.
+  </div>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Como adicionar o módulo agêntico do LangChain4j ao build?</p>
+      <button class="opt" data-k="a">langchain4j-agentic:1.16.2, igual à versão do bedrock</button>
+      <button class="opt" data-k="b">langchain4j-agentic:1.16.2-beta26, pois só o beta existe</button>
+      <button class="opt" data-k="c">Já vem embutido no agregado langchain4j 1.16.2 puro</button>
+      <p class="explain">No Maven Central, o agentic só existe como 1.16.2-beta26; o bedrock é release puro 1.16.2. No mesmo build você usa as duas versões diferentes.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Quem garante idempotência e confirmação numa transferência?</p>
+      <button class="opt" data-k="a">O módulo agentic, via HumanInTheLoop e LoopAgentService</button>
+      <button class="opt" data-k="b">O Bedrock Guardrails, que bloqueia a dupla execução</button>
+      <button class="opt" data-k="c">Você: dedupe por transferId no tool/backend; o gate é seu</button>
+      <p class="explain">Não há primitivo de idempotência/confirmação no framework (1.16.2). É arquitetura determinística sua; o HITL só pergunta, sem semântica de dinheiro.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Na interface de um @Agent, como referenciar variáveis do escopo?</p>
+      <button class="opt" data-k="a">Com @P, a mesma anotação dos parâmetros de @Tool</button>
+      <button class="opt" data-k="b">Com @V, que lê variáveis do AgenticScope (≠ @P da tool)</button>
+      <button class="opt" data-k="c">Com @MemoryId, que injeta o estado compartilhado do escopo</button>
+      <p class="explain">A interface do agente usa @V (variáveis do AgenticScope, saídas de agentes anteriores). @P é para parâmetros de @Tool. São anotações distintas.</p>
+    </div>
+  </div>
+
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/agents">LangChain4j — Agents (tutorial oficial)</a>, que usa um caso bancário. API conferida na fonte 1.16.2 (<code>AgenticServices</code>, <code>LoopAgentService</code>, <code>HumanInTheLoop</code>) e no Maven Central (agentic = só <code>1.16.2-beta26</code>; bedrock = <code>1.16.2</code>). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver um <code>supervisorBuilder</code> roteando entre tools de conta nacional e global, ou o <code>responseProvider</code> de HITL carregando o contexto completo da transferência para uma confirmação informada? É só pedir. <strong>Próxima (Lição 15):</strong> segurança — prompt injection e OWASP LLM Top 10.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0013-java25-concorrencia.html">← 13 · Java 25 e concorrência</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 14 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-12-arquitetura-multibackend.md">curso/modulo-12</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

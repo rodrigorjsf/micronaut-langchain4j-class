@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 13 — Java 25 para chamadas de tool em paralelo (virtual threads, scoped values, structured concurrency)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 3 · Micronaut 5 + Java 25 · Lição 13</p>
+  <h1>Java 25 para chamadas de tool em paralelo</h1>
+  <p class="lede">O banco consulta a conta <strong>nacional</strong> e a <strong>global</strong> em backends distintos. Buscá-las <strong>em paralelo</strong> corta latência — e o Java 25 + LangChain4j dão o caminho GA-seguro, sem cair nos mitos de "tudo novo no 25".</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> latência percebida é experiência do cliente. Mas concorrência mal-entendida vira bug em sistema que move dinheiro. Esta lição separa o que é <strong>GA-seguro hoje</strong> (virtual threads, scoped values, o opt-in de tools concorrentes do LangChain4j) do que ainda é <strong>preview</strong> — e fixa que <strong>concorrência ≠ segurança transacional</strong>.
+  </div>
+
+  <h2>1 · O status REAL dos recursos do Java 25 (corrige o mito)</h2>
+  <table>
+    <thead><tr><th>Recurso</th><th>Status no Java 25</th><th>Flag?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Virtual Threads</strong></td><td><strong>Final desde o JDK 21</strong> (JEP 444); permanente no 25 LTS</td><td>não</td></tr>
+      <tr><td><strong>Scoped Values</strong></td><td><strong>Final no JDK 25</strong> (JEP 506) — <code>orElse</code> não aceita mais <code>null</code></td><td>não</td></tr>
+      <tr><td><strong>Structured Concurrency</strong></td><td><strong>Ainda PREVIEW</strong> (JEP 505, <em>quinto preview</em>)</td><td><strong>sim</strong></td></tr>
+    </tbody>
+  </table>
+  <div class="warn">
+    Não diga "Virtual Threads finalizadas no 25" — final no <strong>21</strong>. E a <code>StructuredTaskScope</code> no JDK 25 <strong>mudou</strong>: agora é aberta por <strong>fábricas estáticas</strong> <code>StructuredTaskScope.open()</code> / <code>open(Joiner)</code> — código de previews 21–24 (<code>new StructuredTaskScope&lt;&gt;()</code>, <code>ShutdownOnFailure</code>) <strong>não compila</strong> no 25.
+  </div>
+
+  <h2>2 · O default do LangChain4j é SEQUENCIAL (o fato-chave)</h2>
+  <p>O <code>AiServices</code> executa múltiplas tools de um turno <strong>sequencialmente</strong> por padrão (verificado em <code>ToolService.execute</code> → <code>executeSequentially</code> quando <code>executor == null</code>). Para paralelizar, é <strong>opt-in</strong>:</p>
+  <pre><code>AiServices.builder(...).executeToolsConcurrently(executor)   // @since 1.4.0</code></pre>
+  <ul>
+    <li>Concorre <strong>apenas</strong> quando o turno tem <strong>&gt;1 tool call</strong> <strong>e</strong> há executor (<code>if (executor != null &amp;&amp; toolRequests.size() &gt; 1)</code>).</li>
+    <li>Para um <code>ChatModel</code> <strong>síncrono</strong> (como o <code>BedrockChatModel</code>), <strong>uma única</strong> tool roda na <strong>thread chamadora</strong> (executor é ignorado, de propósito). <code>StreamingChatModel</code> difere.</li>
+  </ul>
+
+  <h2>3 · Virtual threads por baixo (o fit para I/O)</h2>
+  <p>O executor <strong>default</strong> do <code>executeToolsConcurrently()</code> é um <strong>singleton lazy de virtual-thread-per-task</strong> (<code>DefaultExecutorProvider</code>, padrão Holder; <code>VirtualThreadUtils</code> → <code>Executors.newVirtualThreadPerTaskExecutor()</code> em Java 21+). Fan-out de backends é <strong>I/O-bound</strong> → virtual threads são o encaixe (uma por tarefa; <strong>não faça pool</strong>).</p>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Em produção, deixe o Micronaut dono do executor.</strong> Injete <code>@Named(TaskExecutors.VIRTUAL) ExecutorService</code> (constante <code>"virtual"</code>) e passe-o a <code>executeToolsConcurrently(executor)</code>; rode a chamada bloqueante fora do <em>event loop</em> com <code>@ExecuteOn(TaskExecutors.VIRTUAL)</code>. Assim o <em>lifecycle</em> e a observabilidade do executor ficam com o framework — não com o singleton interno do LangChain4j.</p>
+  </blockquote>
+
+  <h2>4 · Scoped Values: contexto do request (final no 25) — e onde ele NÃO chega</h2>
+  <p><code>ScopedValue</code> (JEP 506, <strong>GA no 25</strong>) carrega identidade/escopo do request de forma <strong>imutável</strong> (mais seguro que <code>ThreadLocal</code> em virtual threads). É herdado pelas subtasks <strong>forkadas por uma <code>StructuredTaskScope</code></strong> — mas <strong>não</strong> se propaga sozinho para as threads de um <code>ExecutorService</code> comum.</p>
+  <pre><code>public static final ScopedValue&lt;String&gt; CUSTOMER_ID = ScopedValue.newInstance();
+// ...
+ScopedValue.where(CUSTOMER_ID, customerId).call(() -&gt; assistant.chat(prompt));</code></pre>
+  <div class="warn">
+    <strong>★ Pegadinha verificada (vs JEP 506) —</strong> o executor <em>default</em> do <code>executeToolsConcurrently()</code> é um <code>newVirtualThreadPerTaskExecutor()</code> <strong>comum</strong> (seção 3), e <code>ScopedValue</code> só é herdado por subtasks de uma <code>StructuredTaskScope</code> — <strong>não</strong> pelas threads desse executor. Logo, dentro de uma tool executada <strong>concorrentemente</strong>, <code>CUSTOMER_ID.get()</code> lançaria <code>NoSuchElementException</code>. A identidade chega à tool concorrente pelo <strong><code>@ToolMemoryId</code></strong> (injetado pelo framework — Lição 7), <strong>não</strong> pelo <code>ScopedValue</code>. Regra prática: <code>ScopedValue</code> para o escopo da thread <em>chamadora</em>; <code>@ToolMemoryId</code> para identidade <em>dentro</em> das tools.
+  </div>
+
+  <h2>5 · Structured Concurrency: "para onde vai" (preview)</h2>
+  <p>A <code>StructuredTaskScope</code> (JEP 505, <strong>preview no 25</strong>) trataria as buscas nacional+global como <strong>uma unidade</strong> (uma falha cancela as irmãs; <em>join</em> estruturado) — mas é <strong>preview</strong> (<code>--enable-preview</code>). <strong>Não ensine como GA.</strong> O primitivo GA-seguro para o fan-out do banco é o <code>executeToolsConcurrently()</code> (que já usa virtual threads por baixo).</p>
+  <pre><code>// PREVIEW (javac --release 25 --enable-preview ; java --enable-preview) — JDK 25 usa open()/open(Joiner):
+// try (var scope = StructuredTaskScope.open(/* Joiner */)) {
+//     var nac = scope.fork(() -> nacional.saldo());
+//     var glb = scope.fork(() -> global.saldo());
+//     scope.join();
+//     return combina(nac.get(), glb.get());
+// }</code></pre>
+
+  <h2>6 · A fronteira: concorrência ≠ segurança transacional</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Paralelizar é otimização de latência, NÃO de transação.</strong> Habilitar <code>executeToolsConcurrently()</code> é seguro para <strong>fan-out de LEITURA</strong> (saldos/extratos nacional + global em paralelo). Operações que <strong>movem dinheiro</strong> continuam exigindo <strong>idempotência + confirmação</strong> (Lições 12/14), rode qual executor rodar. Concorrência <strong>não</strong> dá atomicidade.</p>
+  </blockquote>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por padrão, o LangChain4j 1.16.2 executa múltiplas tools de um turno como?</p>
+      <button class="opt" data-k="a">Em paralelo, usando virtual threads automaticamente</button>
+      <button class="opt" data-k="b">Sequencialmente; o paralelo é opt-in via executeToolsConcurrently</button>
+      <button class="opt" data-k="c">Em paralelo só se o modelo de chat for do tipo streaming</button>
+      <p class="explain">ToolService.execute usa executeSequentially quando executor==null. O paralelo exige executeToolsConcurrently(executor) E mais de uma tool call no turno.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. No Java 25, qual recurso ainda é preview (precisa de --enable-preview)?</p>
+      <button class="opt" data-k="a">Virtual Threads, que foram finalizadas só agora no 25</button>
+      <button class="opt" data-k="b">Scoped Values, que ainda exigem a flag de preview</button>
+      <button class="opt" data-k="c">Structured Concurrency, o JEP 505 (quinto preview)</button>
+      <p class="explain">VT são finais desde o 21; Scoped Values finais no 25 (JEP 506). Só a Structured Concurrency (JEP 505) segue preview, atrás de --enable-preview.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Dá para paralelizar uma transferência de dinheiro com executeToolsConcurrently?</p>
+      <button class="opt" data-k="a">Não como segurança: paralelismo é latência, não transação</button>
+      <button class="opt" data-k="b">Sim: o executor garante a atomicidade entre as chamadas</button>
+      <button class="opt" data-k="c">Sim, desde que rode em structured concurrency com a flag</button>
+      <p class="explain">Concorrência é otimização de I/O para LEITURA. Mover dinheiro exige idempotência + confirmação na sua lógica; o executor não confere atomicidade.</p>
+    </div>
+  </div>
+
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> os JEPs do Java 25 — <a href="https://openjdk.org/jeps/444">444 (Virtual Threads)</a>, <a href="https://openjdk.org/jeps/506">506 (Scoped Values, final)</a>, <a href="https://openjdk.org/jeps/505">505 (Structured Concurrency, preview)</a>. API conferida na fonte 1.16.2 (<code>AiServices.executeToolsConcurrently</code>, <code>ToolService.execute</code>, <code>DefaultExecutorProvider</code>) e no Micronaut (<code>TaskExecutors.VIRTUAL</code>). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver o <code>@Controller</code> Micronaut injetando <code>@Named(TaskExecutors.VIRTUAL)</code> e medindo o ganho de latência do fan-out nacional+global, ou um exemplo de como a identidade alcança as tools concorrentes via <code>@ToolMemoryId</code> (e por que o <code>ScopedValue</code> não cruza o executor)? É só pedir. <strong>Próxima (Lição 14):</strong> arquitetura multi-backend do banco.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0012-micronaut-integracao.html">← 12 · Integração Micronaut</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 13 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-11-java25-concorrencia.md">curso/modulo-11</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

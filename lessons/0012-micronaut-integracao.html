@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 12 — Integração micronaut-langchain4j: DI de compilação (e a versão real)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 3 · Micronaut 5 + Java 25 · Lição 12</p>
+  <h1>Integração micronaut-langchain4j: DI de compilação (e a versão real)</h1>
+  <p class="lede">Tudo que você aprendeu da API standalone agora entra no <strong>Micronaut 5</strong> via <strong>injeção de dependências em tempo de compilação</strong>. E a primeira lição é uma verdade <strong>verificada na fonte</strong>: a versão que o seu stack realmente recebe.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> em produção, o assistente do banco não é montado "na mão": o Micronaut <strong>fia</strong> o modelo Bedrock, as tools, a memória e o RAG por DI de compilação (sem reflexão em runtime, ideal para GraalVM). Mas você precisa saber <strong>qual versão</strong> do LangChain4j o módulo resolve — senão ensina uma API que o seu build não tem.
+  </div>
+
+  <h2>1 · A verdade da versão (manchete verificada)</h2>
+  <div class="warn">
+    <strong>O <code>micronaut-langchain4j 2.0.1</code> NÃO embarca 1.16.2.</strong> O catálogo fixa <code>managed-langchain4j = "1.15.1"</code>, <code>managed-langchain4j-community = "1.15.0-beta25"</code>, <code>micronaut = "5.0.1"</code>; o BOM importado é o <strong><code>langchain4j-bom 1.15.1</code></strong>.
+  </div>
+  <p><strong>O que fazer</strong> (Foundation First — saber a versão real é competência):</p>
+  <ul>
+    <li><strong>(a)</strong> usar a superfície como <strong>1.15.1</strong> — as APIs centrais (<code>@Tool</code>, <code>@P</code>, <code>AiServices</code>, <code>BedrockChatModel</code>) são estáveis entre 1.15 e 1.16; ou</li>
+    <li><strong>(b)</strong> <strong>sobrescrever o <code>langchain4j-bom</code> para 1.16.2</strong> e <strong>re-verificar os deltas</strong> — recursos que ensinamos em 1.16.2 (capability de JSON schema da Lição 10, framework de guardrails <code>@Experimental</code> da 11, <code>BedrockGuardrailConfiguration</code>, <code>promptCaching</code> da 8) podem diferir ou não existir em 1.15.1.</li>
+  </ul>
+
+  <h2>2 · O que o módulo faz por você (DI de compilação)</h2>
+  <table>
+    <thead><tr><th>Recurso</th><th>Como (verificado @ v2.0.1)</th></tr></thead>
+    <tbody>
+      <tr><td>Beans de modelo Bedrock</td><td><code>@Lang4jConfig</code> em <code>BedrockModule</code> → processador gera <code>@ConfigurationProperties</code>/<code>@Factory</code> → <code>BedrockChatModel</code> (Converse)</td></tr>
+      <tr><td>Declarar AI service</td><td><code>@AiService</code> numa interface — vira bean com DI de compilação</td></tr>
+      <tr><td>Tools</td><td><code>@Tool</code> em bean <code>@Singleton</code>; registradas em compilação pelo <code>ToolRegistry</code> (sem varredura de classpath)</td></tr>
+      <tr><td>RAG automático</td><td>havendo beans <code>EmbeddingModel</code> <strong>e</strong> <code>EmbeddingStore</code>, o <code>AiServiceFactory</code> compõe um <code>EmbeddingStoreContentRetriever</code></td></tr>
+      <tr><td>Memória</td><td><code>ChatMemoryProvider</code> por bean; store default <code>InMemoryChatMemoryStore</code> (Redis/Neo4j/Cassandra = módulos à parte)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3 · Configurar o Bedrock (armadilhas verificadas)</h2>
+  <ul>
+    <li><strong>Prefixo código-verdade: <code>langchain4j.bedrock</code></strong> (<code>.model</code>, <code>.region</code>). ⚠️ A doc oficial mostra <code>langchain4j.bedrock-llama</code> — <strong>obsoleto/incorreto</strong> em 2.0.1 (que não declara modelo Llama). Copiar a doc literalmente dá um prefixo que não funciona.</li>
+    <li><strong>Autenticação = credenciais AWS, nunca api-key.</strong> <code>credentialsProvider</code> é <code>injected=true, required=true</code> → registre um bean <code>AwsCredentialsProvider</code> (ex.: <code>micronaut-aws</code> SDK v2). O <code>api-key</code> do <code>BedrockTest</code> é só gatilho de teste.</li>
+    <li><strong>Model default = <code>claude-3-haiku-20240307</code></strong> (alias). Em produção, defina um <strong>model id / inference profile</strong> explícito via <code>langchain4j.bedrock.model</code>.</li>
+  </ul>
+
+  <h2>4 · <code>@AiService</code>, <code>@Tool</code> e a dívida do <code>@P</code> (resolvida)</h2>
+  <p><code>@AiService</code> (<code>io.micronaut.langchain4j.annotation</code>): <code>value()</code>/<code>named()</code> escolhem o bean de modelo; <code>tools()</code> lista as classes de tools; <code>customizer()</code> ajusta o builder.</p>
+  <div class="warn">
+    <strong>Tools só são fiadas se listadas em <code>@AiService(tools={...})</code></strong> — <code>getAllTools()</code> <strong>não</strong> é aplicado automaticamente, e os métodos <code>@Tool</code> <strong>precisam estar em beans <code>@Singleton</code></strong>. Esquecer um dos dois = o modelo nunca enxerga a tool.
+  </div>
+  <blockquote class="insight">
+    <p><span class="star">★ Dívida de verificação resolvida —</span> em 1.15.1, <code>@P</code> <strong>tem</strong> <code>name()</code>. O <strong>plugin Gradle do Micronaut adiciona <code>-parameters</code> por padrão</strong> (PR #153) → nomes simples de parâmetro já funcionam. Mas um build <strong>Maven puro sem</strong> <code>&lt;parameters&gt;true&lt;/parameters&gt;</code> gera <code>arg0/arg1</code> (confunde o modelo) → aí <code>@P(name=...)</code> é <strong>obrigatório</strong>.</p>
+  </blockquote>
+
+  <h2>5 · O assistente do banco, fiado por DI</h2>
+  <pre><code># application.yml — SOURCE-OF-TRUTH prefix for 2.0.1
+langchain4j:
+  bedrock:
+    model: anthropic.claude-3-5-sonnet-20240620-v1:0   # explicit in prod (not the haiku alias)
+    region: us-east-1
+# authentication = AWS credentials → register an AwsCredentialsProvider (micronaut-aws SDK v2)</code></pre>
+  <pre><code>@Factory
+class AwsConfig {                                  // bean REQUIRED for Bedrock to authenticate
+    @Singleton AwsCredentialsProvider creds() { return DefaultCredentialsProvider.create(); }
+}
+
+@Singleton                                         // @Tool methods MUST live in a @Singleton
+class BankingTools {
+    @Tool("Consulta o saldo de uma conta (nacional ou global)")
+    String saldo(@P("numero da conta") String accountId, @P("escopo: NACIONAL|GLOBAL") String scope) { /* ... */ }
+
+    @Tool("Transfere valor; exige idempotencyKey para evitar dupla execução")
+    String transferir(@P("conta origem") String from, @P("conta destino") String to,
+                      @P("valor em centavos") long amountCents,   // primitive: required IS validated in 1.x
+                      @P("chave de idempotência") String idempotencyKey) {
+        // confirmation + idempotency live HERE (the framework only routes the call)
+    }
+}
+
+@AiService(tools = { BankingTools.class })         // tools ONLY wire in if listed here
+interface BankingAssistant {
+    @SystemMessage("Você é um assistente bancário. Nunca efetive transferências sem confirmação.")
+    String chat(String userMessage);
+}
+// inject BankingAssistant into any @Controller/@Singleton</code></pre>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Qual versão do LangChain4j o micronaut-langchain4j 2.0.1 resolve por padrão?</p>
+      <button class="opt" data-k="a">A 1.16.2, a mesma das lições standalone anteriores</button>
+      <button class="opt" data-k="b">A 1.15.1 (community 1.15.0-beta25), e não a 1.16.2</button>
+      <button class="opt" data-k="c">A mais recente disponível, baixada no tempo de build</button>
+      <p class="explain">O catálogo de versões da tag v2.0.1 fixa managed-langchain4j = 1.15.1 e importa o langchain4j-bom 1.15.1. Para ter 1.16.2, sobrescreva o BOM e re-verifique deltas.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>2. Uma classe @Tool não aparece para o modelo. Causa mais provável?</p>
+      <button class="opt" data-k="a">Não foi listada em @AiService(tools) ou não é @Singleton</button>
+      <button class="opt" data-k="b">O Bedrock não suporta tool calling pela API Converse</button>
+      <button class="opt" data-k="c">Faltou anotar cada método @Tool com @Executable na mão</button>
+      <p class="explain">O AiServiceFactory só chama builder.tools() para classes listadas em @AiService(tools={...}); e o ToolRegistry só registra @Tool em beans @Singleton.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Como o BedrockChatModel autentica sob micronaut-langchain4j?</p>
+      <button class="opt" data-k="a">Por uma api-key definida em langchain4j.bedrock.api-key</button>
+      <button class="opt" data-k="b">Por um bean AwsCredentialsProvider (credenciais AWS)</button>
+      <button class="opt" data-k="c">Pelo próprio modelId, que embute o ARN do perfil</button>
+      <p class="explain">credentialsProvider é injected=true, required=true: registre um AwsCredentialsProvider (ex.: micronaut-aws). O api-key do BedrockTest é só gatilho de teste.</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://micronaut-projects.github.io/micronaut-langchain4j/latest/guide/">Micronaut LangChain4j — guia oficial</a> (ciente da divergência doc-vs-código no prefixo Bedrock). Versões conferidas no <a href="https://raw.githubusercontent.com/micronaut-projects/micronaut-langchain4j/v2.0.1/gradle/libs.versions.toml">catálogo da tag v2.0.1</a> e na fiação (<code>AiServiceFactory</code>, <code>ToolRegistry</code>, <code>BedrockModule</code>). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver o build (Gradle vs. Maven) sobrescrevendo o <code>langchain4j-bom</code> para 1.16.2 e os deltas que isso reintroduz, ou um <code>@Controller</code> Micronaut injetando o <code>BankingAssistant</code>? É só pedir. <strong>Próxima (Lição 13):</strong> Java 25 para chamadas de tool em paralelo.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0011-guardrails-moderacao.html">← 11 · Guardrails e moderação</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 12 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-10-micronaut-integracao.md">curso/modulo-10</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

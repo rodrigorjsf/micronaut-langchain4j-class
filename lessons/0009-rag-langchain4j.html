@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 9 — RAG no LangChain4j: um store, dois mundos (nacional e global) sem vazar</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 2 · LangChain4j · Lição 9</p>
+  <h1>RAG no LangChain4j: um store, dois mundos sem vazar</h1>
+  <p class="lede">A <a href="0005-rag.html">Lição 5</a> terminou com um <em>esboço</em> da arquitetura RAG do banco. Aqui ele vira <strong>código verificado</strong> do LangChain4j 1.16.2, invocando o Claude <strong>via AWS Bedrock</strong> — com a peça crítica sendo o <strong>filtro forçado pelo servidor</strong> que separa a conta nacional da global.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> o desafio central do seu banco é manter <strong>conta nacional</strong> e <strong>conta global</strong> (regras de backends distintos) <em>jamais</em> misturadas. Esta lição entrega <strong>um ganho</strong>: cablar um <code>ContentRetriever</code> com filtro de entitulamento <strong>forçado pelo servidor</strong> no seu <code>AiService</code>, de modo que um cliente nacional nunca recupere um documento global.
+  </div>
+
+  <h2>1 · Os dois níveis de API (o mesmo padrão da Lição 6)</h2>
+  <p>Assim como o <code>AiServices</code> embrulha o <code>ChatModel</code> (<a href="0006-arquitetura-langchain4j.html">Lição 6</a>), o RAG entra no <code>AiServices</code> por <strong>dois</strong> caminhos — e <strong>não há um terceiro</strong>:</p>
+  <table>
+    <thead><tr><th>Caminho</th><th>Método no builder</th><th>Quando</th></tr></thead>
+    <tbody>
+      <tr><td><strong>RAG ingênuo</strong></td><td><code>.contentRetriever(ContentRetriever)</code></td><td>caso comum: "busque top-k e injete"</td></tr>
+      <tr><td><strong>RAG avançado</strong></td><td><code>.retrievalAugmentor(RetrievalAugmentor)</code></td><td>transformação/roteamento/re-rank/citação (§7)</td></tr>
+    </tbody>
+  </table>
+  <div class="warn">
+    <strong>Correção verificada na fonte (1.16.2):</strong> <strong>não existe</strong> <code>AiServices.retriever(...)</code> — código que o chama <strong>não compila</strong> (a palavra "retriever" só sobrevive na <em>string</em> de erro). Os dois métodos são <strong>mutuamente exclusivos</strong>: setar ambos lança <code>"Only one out of [retriever, contentRetriever, retrievalAugmentor] can be set"</code>. O caminho simples monta, por baixo, um <code>DefaultRetrievalAugmentor</code>.
+  </div>
+  <p>As interfaces (ambas em <code>langchain4j-core</code>): <code>ContentRetriever</code> tem <code>List&lt;Content&gt; retrieve(Query)</code> (lista ordenada por relevância); <code>RetrievalAugmentor</code> tem <code>AugmentationResult augment(AugmentationRequest)</code> — o ponto de entrada do fluxo.</p>
+
+  <h2>2 · Os dois pipelines da Lição 5, agora em classes</h2>
+  <pre><code>INGESTÃO (offline)   Documento → Quebrar → Embeddar → Guardar
+                                  DocumentSplitter · EmbeddingModel · EmbeddingStore
+                                  └──────── EmbeddingStoreIngestor ────────┘
+
+RECUPERAÇÃO (online) Pergunta → embeddar → buscar top-k → FILTRAR → injetar
+                                  └─ EmbeddingStoreContentRetriever ─┘</code></pre>
+  <div class="warn">
+    <strong>Pegadinha de módulos (verificada):</strong> o <code>rag.*</code>, o <code>Filter</code>, o <code>EmbeddingStoreContentRetriever</code> e o <code>EmbeddingStoreIngestor</code> vivem em <code>langchain4j-core</code>; mas o <code>AiServices</code>, o <code>DocumentSplitters</code> e o <code>InMemoryEmbeddingStore</code> vivem no módulo agregador <code>langchain4j</code>. E há <strong>dois trilhos de versão</strong> na tag 1.16.2: <strong>stable 1.16.2</strong> (core, langchain4j, bedrock) vs <strong>beta 1.16.2-beta26</strong> (pgvector, cohere, voyage). Misturar a versão errada não resolve → gerencie tudo pelo <code>langchain4j-bom</code>.
+  </div>
+
+  <h2>3 · O embedding na Bedrock (a escolha do banco, para pt-BR)</h2>
+  <p>O modelo de embedding é <strong>separado</strong> do de chat (Lição 5 §3). A Anthropic <strong>não tem</strong> API de embeddings (verificado: <code>langchain4j-anthropic</code> só traz chat) — e como a invocação do banco é <strong>via Bedrock</strong>, o embedding também vem da Bedrock:</p>
+  <ul>
+    <li><strong>Produção (pt-BR):</strong> <code>BedrockCohereEmbeddingModel</code> + <code>cohere.embed-multilingual-v3</code> (1024-dim, <strong>GA</strong>, feito para 100+ idiomas incl. português). O <code>amazon.titan-embed-text-v2:0</code> é <strong>GA</strong> (desde abr/2024), mas é <strong>otimizado para inglês</strong> (não multilíngue-first) — por isso, para pt-BR, prefira o Cohere multilíngue como caminho primário.</li>
+    <li><strong>Pegadinha crítica (verificada):</strong> no Cohere o <code>inputType</code> é <strong>obrigatório e fixo por instância</strong>. A AWS manda embeddar o corpus com <code>SEARCH_DOCUMENT</code> e a pergunta com <code>SEARCH_QUERY</code> → você precisa de <strong>DUAS instâncias</strong> (uma para o ingestor, outra para o retriever). Cada texto é limitado a <strong>512 tokens</strong> → quebre pequeno no splitter.</li>
+  </ul>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Assimetria de credenciais (verificada):</strong> os builders de <strong>embedding</strong> da Bedrock têm <code>credentialsProvider(...)</code>, mas o <code>BedrockChatModel</code> <strong>não tem</strong> — ele fixa <code>DefaultCredentialsProvider.create()</code>. Para usar assume-role/STS no chat, você constrói seu próprio <code>BedrockRuntimeClient</code> e injeta via <code>.client(...)</code>. É o tipo de detalhe que só a fonte revela — e que num banco (onde credenciais são auditadas) muda o desenho.</p>
+  </blockquote>
+
+  <h2>4 · A joia da coroa: TRÊS metadados e o filtro do servidor</h2>
+  <p>O desafio nacional-vs-global resolve-se com <strong>filtro por metadado</strong>. Mas há <strong>três</strong> <code>Metadata</code> confundíveis — e o erro mora em trocá-las:</p>
+  <table>
+    <thead><tr><th>Tipo</th><th>Papel</th><th>Tem <code>account_scope</code>?</th></tr></thead>
+    <tbody>
+      <tr><td><code>data.document.Metadata</code></td><td>tags de negócio no <strong>segmento</strong></td><td><strong>SIM — é o que <code>Filter.test()</code> lê</strong></td></tr>
+      <tr><td><code>rag.query.Metadata</code></td><td>contexto da query (chatMemoryId, …)</td><td>não</td></tr>
+      <tr><td><code>Content.metadata()</code></td><td>bookkeeping (enum <code>ContentMetadata</code>)</td><td>não</td></tr>
+    </tbody>
+  </table>
+  <div class="warn">
+    <strong>A linha mais sensível à segurança (corrigida pela fonte):</strong> <code>query.metadata().get("account_scope")</code> <strong>NÃO EXISTE</strong> — a <code>rag.query.Metadata</code> não tem <code>get(String)</code>. O caminho correto, com <strong>null-check</strong> (a <code>Query</code> de um argumento tem <code>metadata()==null</code>):
+  </div>
+  <pre><code>String scope = query.metadata().invocationParameters().get("account_scope"); // &lt;T&gt; T get(String)
+// ou, quando o escopo deriva do usuário logado:
+Object userId = query.metadata().chatMemoryId(); // "Can be used to distinguish between users."</code></pre>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>O escopo vem do SERVIDOR, não do modelo.</strong> Entitulamento é <em>autorização</em> (Lição 1: identidade na camada determinística). O <code>dynamicFilter</code> (<code>Function&lt;Query, Filter&gt;</code>) lê o escopo <strong>confiável</strong> passado pelo servidor (em <code>invocationParameters</code>, ou derivado do <code>chatMemoryId</code>) — <strong>nunca</strong> de algo que o modelo escreveu. Ele se compõe com <code>AND</code> a uma faceta de produto que o modelo <em>pode</em> sugerir (self-query, Lição 5 §8): <code>Filter.and(escopoDoServidor, produtoDoModelo)</code>. O modelo ajuda a refinar; ele <strong>jamais</strong> decide a fronteira de acesso.</p>
+  </blockquote>
+  <p><strong>A garantia de separação (verificada):</strong> <code>IsEqualTo.test()</code> retorna <code>false</code> quando o segmento <strong>não contém</strong> a chave (guarda <code>containsKey</code>). Logo um segmento "global" <strong>nunca</strong> casa <code>metadataKey("account_scope").isEqualTo("national")</code>. É esse <code>false</code> que mantém os dois mundos apartados.</p>
+  <p class="fine">Outras armadilhas verificadas: <code>filter(null)</code> é um <strong>no-op silencioso</strong> (não limpa um filtro já setado); <code>account_scope</code> <strong>tem de ser String</strong> (os tipos da <code>data.document.Metadata</code> são um conjunto fechado); e <code>minScore</code>/<code>maxResults</code> no builder do retriever são validados <strong>na primeira query</strong>, não no <code>build()</code>.</p>
+
+  <h2>5 · O portão de segurança: nem todo store APLICA o filtro</h2>
+  <div class="warn">
+    <code>EmbeddingStore.search(...)</code> avisa, verbatim: <em>"not all EmbeddingStore implementations support Filtering."</em> Um store que <strong>ignora</strong> o filtro transforma seu entitulamento em <strong>no-op silencioso = vazamento entre contas, sem nenhum erro</strong>. Por isso a escolha do store é decisão de <strong>segurança</strong>, não só de infraestrutura.
+  </div>
+  <ul>
+    <li><strong><code>InMemoryEmbeddingStore</code></strong> (módulo <code>langchain4j</code>; <strong>sem <code>builder()</code></strong> → use <code>new InMemoryEmbeddingStore&lt;&gt;()</code>): <strong>APLICA</strong> o filtro em processo — o <code>search()</code> faz <code>if (!filter.test(meta)) continue;</code>. Ótimo para o <strong>demo</strong>.</li>
+    <li><strong><code>PgVectorEmbeddingStore</code></strong> (<code>langchain4j-pgvector</code>, beta26; cosine-only/ivfflat-only): <strong>APLICA</strong> compilando o <code>Filter</code> para <strong>SQL</strong>. <code>MetadataStorageMode</code> default = <code>COMBINED_JSON</code>. Caminho de <strong>produção</strong>.</li>
+  </ul>
+
+  <h2>6 · O assistente do banco (verificado na fonte)</h2>
+  <pre><code>static final String SCOPE = "account_scope";   // valor SEMPRE String ("national"/"global")
+
+// (0) Pontas Bedrock — DUAS instâncias de embedding (inputType fixo por instância).
+EmbeddingModel docEmbedder = BedrockCohereEmbeddingModel.builder()
+        .model(Model.COHERE_EMBED_MULTILINGUAL_V3)  // "cohere.embed-multilingual-v3" (pt-BR)
+        .inputType(InputType.SEARCH_DOCUMENT)       // OBRIGATÓRIO — indexar o corpus
+        .region(Region.US_EAST_1).build();
+EmbeddingModel queryEmbedder = BedrockCohereEmbeddingModel.builder()
+        .model(Model.COHERE_EMBED_MULTILINGUAL_V3)
+        .inputType(InputType.SEARCH_QUERY)          // OBRIGATÓRIO — embeddar a pergunta
+        .region(Region.US_EAST_1).build();
+ChatModel chat = BedrockChatModel.builder()
+        .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0") // inference profile cross-region
+        .region(Region.US_EAST_1).build();
+EmbeddingStore&lt;TextSegment&gt; store = new InMemoryEmbeddingStore&lt;&gt;(); // demo (aplica o filtro)
+
+// (1) INGESTÃO — tag o discriminador UMA vez no Document; o splitter o copia
+//     verbatim para CADA segmento. (Parágrafo→Linha→Frase→Palavra→Caractere.)
+void ingest(String texto, String scope) {
+    Document doc = Document.from(texto, Metadata.from(SCOPE, scope));
+    EmbeddingStoreIngestor.builder()
+            .documentSplitter(DocumentSplitters.recursive(300, 30)) // pequeno (limite 512 tok do Cohere)
+            .embeddingModel(docEmbedder).embeddingStore(store).build()
+            .ingest(doc);                            // IngestionResult só tem tokenUsage()
+}
+
+// (2) RETRIEVAL — filtro POR USUÁRIO, forçado pelo servidor.
+Function&lt;Query, Filter&gt; escopoDoUsuario = query -> {
+    String scope = null;
+    if (query.metadata() != null &amp;&amp; query.metadata().invocationParameters() != null)
+        scope = query.metadata().invocationParameters().get(SCOPE);
+    if (scope == null) scope = "national";           // default seguro: nunca vaza global
+    return metadataKey(SCOPE).isEqualTo(scope);      // segmento sem a chave nunca casa
+};
+EmbeddingStoreContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+        .embeddingStore(store).embeddingModel(queryEmbedder)   // o embedder de QUERY
+        .maxResults(5).minScore(0.6)
+        .dynamicFilter(escopoDoUsuario).build();
+
+// (3) WIRING — caminho SIMPLES (não existe .retriever(...)).
+interface BankAssistant { String chat(String pergunta); }
+BankAssistant assistant = AiServices.builder(BankAssistant.class)
+        .chatModel(chat)
+        .contentRetriever(retriever)                 // RAG ingênuo
+        .build();</code></pre>
+  <p>Uma <code>EmbeddingStore</code>, <code>account_scope</code> no metadado do segmento, um <code>dynamicFilter</code> que lê o escopo <strong>confiável</strong> do servidor, e um store que <strong>aplica</strong> o <code>Filter.test</code>. O <code>BedrockChatModel</code> cabla como qualquer <code>ChatModel</code>. Resultado: o cliente nacional nunca recupera o doc global.</p>
+
+  <h2>7 · Prévia: o RAG avançado mapeado na Lição 5 §8</h2>
+  <p>Quando o ingênuo não basta, o <code>DefaultRetrievalAugmentor</code> destrincha um <strong>pipeline de 5 estágios</strong> — cada um é o nome-de-framework de um padrão que a Lição 5 §8 já ensinou:</p>
+  <table>
+    <thead><tr><th>Estágio</th><th>Classe(s) 1.16.2</th><th>Padrão (Lição 5 §8)</th></tr></thead>
+    <tbody>
+      <tr><td>1 · Transformar</td><td><code>QueryTransformer</code> → Compressing/Expanding</td><td>multi-query, HyDE</td></tr>
+      <tr><td>2 · Rotear</td><td><code>QueryRouter</code> → Default / LanguageModel</td><td>self-query / roteamento</td></tr>
+      <tr><td>3 · Agregar</td><td><code>ContentAggregator</code> → Default(RRF) / ReRanking</td><td>re-ranqueamento</td></tr>
+      <tr><td>4 · Injetar</td><td><code>ContentInjector</code> → Default</td><td>injeção + <strong>citação</strong></td></tr>
+    </tbody>
+  </table>
+  <p class="fine">Notas verificadas: o <code>queryRouter</code> é <strong>obrigatório</strong> (NPE no <code>build()</code> se nulo); <code>DefaultQueryRouter</code> manda toda query a <strong>todos</strong> os retrievers (para escolher por backend, use <code>LanguageModelQueryRouter</code>); as classes LLM usam <code>ChatModel</code> (não o legado <code>ChatLanguageModel</code>). Para "um store + filtro", o caminho do §6 é mais simples e mais seguro. Mergulho profundo numa lição futura.</p>
+
+  <h2>8 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Onde mora a tag <code>account_scope</code> que o filtro inspeciona?</p>
+      <button class="opt" data-k="a">Na rag.query.Metadata, lida com query.metadata().get()</button>
+      <button class="opt" data-k="b">Na data.document.Metadata do segmento, lida por Filter.test</button>
+      <button class="opt" data-k="c">Na Content.metadata(), sob uma chave do enum ContentMetadata</button>
+      <p class="explain">A rag.query.Metadata nem tem get(String); a Content.metadata() é só bookkeeping. O filtro lê o metadado do segmento.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Por que o escopo (nacional/global) vem do servidor, não do modelo?</p>
+      <button class="opt" data-k="a">Porque o modelo às vezes erra e troca os escopos sozinho</button>
+      <button class="opt" data-k="b">Porque ler do modelo custa mais latência do que do servidor</button>
+      <button class="opt" data-k="c">Porque entitulamento é autorização: nunca confie no texto gerado</button>
+      <p class="explain">Identidade/autorização vivem na camada determinística (Lição 1). O dynamicFilter lê o escopo confiável de invocationParameters/chatMemoryId.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. E se o <code>EmbeddingStore</code> não suportar filtro de metadado?</p>
+      <button class="opt" data-k="a">Ele lança um erro no build avisando que o filtro caiu</button>
+      <button class="opt" data-k="b">Ignora o filtro em silêncio, virando vazamento entre contas</button>
+      <button class="opt" data-k="c">Aplica o filtro mesmo assim por varredura linear na RAM</button>
+      <p class="explain">"not all EmbeddingStore implementations support Filtering." Sem suporte, o filtro é no-op silencioso. InMemory e pgvector aplicam; confirme o seu.</p>
+    </div>
+  </div>
+
+  <h2>9 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/rag">LangChain4j — RAG (tutorial oficial)</a> (RAG ingênuo vs. avançado, <code>EmbeddingStoreContentRetriever</code>, <code>RetrievalAugmentor</code>), complementada pela doc da <a href="https://docs.aws.amazon.com/bedrock/">AWS Bedrock</a> (model IDs/inference profiles, embeddings Titan/Cohere). API conferida na <a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/rag/content/retriever/EmbeddingStoreContentRetriever.java">fonte 1.16.2</a>. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver o <code>dynamicFilter</code> compondo escopo (servidor) + produto (self-query) com <code>Filter.and</code>, ou o desenho da ingestão multi-produto com pgvector e <code>removeAll(Filter)</code> para "esquecer" um escopo? É só pedir.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0008-chatmemory-contexto.html">← 8 · ChatMemory e contexto</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 9 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-08-rag-langchain4j.md">curso/modulo-08</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

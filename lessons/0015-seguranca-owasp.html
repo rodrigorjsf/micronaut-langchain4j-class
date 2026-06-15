@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 15 — Segurança: prompt injection e o OWASP LLM Top 10 (2025)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 4 · Produção, Segurança e Escala · Lição 15</p>
+  <h1>Segurança: prompt injection e o OWASP LLM Top 10 (2025)</h1>
+  <p class="lede">A lição-capstone de segurança: ela <strong>costura</strong> as defesas das lições anteriores (1, 7, 9, 10, 11) no padrão de mercado — o <strong>OWASP Top 10 para Aplicações LLM, edição 2025 (v2.0)</strong> — e fixa a linha-mestra: <strong>o controle vive no código, nunca no prompt</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> num banco, segurança não é um módulo "extra": é o que decide se o sistema pode ir a produção. Esta lição te dá um <strong>checklist auditável</strong> (o OWASP 2025) e mostra que cada item já tem uma defesa que você construiu — desde que entenda que <strong>autorização é determinística</strong>, não uma instrução ao modelo.
+  </div>
+
+  <h2>1 · A edição certa (corrige o mito)</h2>
+  <div class="warn">
+    A edição <strong>atual é 2025 (v2.0)</strong>. <strong>Não existe</strong> edição 2026 <em>de Aplicações LLM</em> — o "2026" é o <strong>OWASP Top 10 for Agentic Applications</strong> (ASI Top 10, IDs <code>ASI##</code>), projeto <strong>separado</strong>. <strong>Novos</strong> em 2025: <strong>LLM07 System Prompt Leakage</strong> e <strong>LLM08 Vector and Embedding Weaknesses</strong>. Prompt Injection é o <strong>#1 (LLM01)</strong> nas duas edições.
+  </div>
+
+  <h2>2 · LLM01 Prompt Injection: direta vs. indireta</h2>
+  <ul>
+    <li><strong>Direta</strong> (verbatim): <em>"a user's prompt input directly alters the behavior of the model"</em> — o cliente digitando um jailbreak no chat.</li>
+    <li><strong>Indireta</strong> (verbatim): <em>"an LLM accepts input from external sources, such as websites or files"</em> — a <strong>variante RAG</strong>, a mais fácil de subestimar: instrução escondida no <strong>dado ingerido</strong> (um PDF de extrato, um campo de memo de transação, o corpo de um ticket). E <em>"injections do not need to be human-visible/readable, as long as the content is parsed by the model"</em>.</li>
+  </ul>
+
+  <h2>3 · O mapa: OWASP 2025 → cenário do banco → defesa</h2>
+  <table>
+    <thead><tr><th>#</th><th>Cenário no banco</th><th>Defesa (lição)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>LLM01</strong> Prompt Injection</td><td>jailbreak no chat; instrução escondida num extrato ingerido</td><td>guardrails de entrada (L11); segregar conteúdo externo; teste adversarial</td></tr>
+      <tr><td><strong>LLM02</strong> Sensitive Info Disclosure</td><td>vazar dados da conta global / de outro cliente</td><td><strong>authz server-side + filtro por cliente (L9)</strong>; sanitização</td></tr>
+      <tr><td><strong>LLM03</strong> Supply Chain</td><td>dependência/modelo comprometido</td><td>fixar model id Bedrock + versões LangChain4j/Micronaut</td></tr>
+      <tr><td><strong>LLM04</strong> Data &amp; Model Poisoning</td><td>doc envenenado ingerido no vector store</td><td>curadoria de ingestão; validação (overlap LLM08)</td></tr>
+      <tr><td><strong>LLM05</strong> Improper Output Handling</td><td>saída do modelo vira XSS/SSRF/RCE no backend</td><td><strong>saída tipada (L10)</strong>; zero-trust na saída; <em>parameterized queries</em></td></tr>
+      <tr><td><strong>LLM06</strong> Excessive Agency</td><td>transferência sem confirmação/idempotência</td><td><strong>least-privilege (L7)</strong> + <em>complete mediation</em> + HITL (L14)</td></tr>
+      <tr><td><strong>LLM07</strong> System Prompt Leakage <em>(novo)</em></td><td>segredo/regra de authz no system prompt vaza</td><td><strong>nunca</strong> ponha segredo/authz no prompt — server-side (L1)</td></tr>
+      <tr><td><strong>LLM08</strong> Vector/Embedding Weaknesses <em>(novo)</em></td><td>vazamento cross-tenant num vector store compartilhado</td><td><strong>partição por metadado (L9)</strong> — <em>verbatim</em> no OWASP</td></tr>
+      <tr><td><strong>LLM09</strong> Misinformation</td><td>saldo/conselho alucinado</td><td><strong>RAG grounding (L9) + guardrail de saída (L11)</strong></td></tr>
+      <tr><td><strong>LLM10</strong> Unbounded Consumption</td><td><em>denial-of-wallet</em> (custo de inferência)</td><td>rate-limit por cliente (L18)</td></tr>
+    </tbody>
+  </table>
+  <p>A relação <strong>mecanismo → entrada é muitos-para-muitos</strong>: um mecanismo cobre várias entradas (authz server-side → LLM06 <strong>e</strong> LLM02) e uma entrada precisa de vários mecanismos. É <strong>defesa em profundidade</strong>, não 1:1.</p>
+
+  <h2>4 · A linha-mestra: o controle vive no código, nunca no prompt</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>O OWASP diz, com todas as letras, o que esta trilha repete desde a Lição 1.</strong> LLM06 <em>Complete mediation</em> (verbatim): <em>"Implement authorization in downstream systems rather than relying on an LLM to decide if an action is allowed or not."</em> LLM06 <em>Require user approval</em>: human-in-the-loop para ações de alto impacto. LLM07: o system prompt <strong>não</strong> guarda segredo. Conclusão: <strong>autenticação, autorização, confirmação e idempotência são determinísticas e suas</strong>; guardrails e saída tipada <strong>reduzem risco residual</strong>, não substituem o controle. Um system prompt dizendo "só aja na conta do próprio cliente" <strong>não é um controle</strong> — o modelo pode ser persuadido a desobedecer.</p>
+  </blockquote>
+
+  <h2>5 · As duas prioridades do banco (código)</h2>
+  <p>LLM06 (Excessive Agency) e LLM08/LLM02 (vazamento cross-tenant) são as mais críticas. Os controles são <strong>Java puro determinístico</strong> — não há anotação que os substitua:</p>
+  <pre><code>// LLM05/LLM01: saída tipada limita o que o modelo pode emitir (não texto livre de transferência)
+record TransferRequest(String fromAccountId, String toAccountId, long amountCents, String idempotencyKey) {}
+
+class TransferService {                          // LLM06 "complete mediation": authz no backend, não no modelo
+    Receipt execute(TransferRequest req, AuthenticatedCustomer caller, boolean humanConfirmed) {
+        if (!caller.ownsAccount(req.fromAccountId()))      // LLM06 + LLM02: saída do modelo é não-confiável
+            throw new ForbiddenException("caller does not own source account");
+        if (!humanConfirmed)                               // LLM06 "require user approval" (HITL)
+            throw new ConfirmationRequiredException();
+        rateLimiter.check(caller.id());                    // LLM10: anti denial-of-wallet
+        return ledger.transferIdempotent(req);             // idempotencyKey deduplica retries
+    }
+}</code></pre>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Qual a edição atual do OWASP Top 10 para Aplicações LLM?</p>
+      <button class="opt" data-k="a">A de 2026, recém-lançada para aplicações LLM</button>
+      <button class="opt" data-k="b">A de 2025 (v2.0); não há edição 2026 de LLM</button>
+      <button class="opt" data-k="c">Ainda a de 2023/24, que segue como a vigente</button>
+      <p class="explain">A edição atual é 2025 (v2.0). O "2026" é o projeto separado de Aplicações Agênticas (ASI Top 10), não a lista de Aplicações LLM.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. O que é injeção de prompt INDIRETA num banco?</p>
+      <button class="opt" data-k="a">O cliente digitando um jailbreak direto na janela de chat</button>
+      <button class="opt" data-k="b">Instrução maliciosa escondida em dado ingerido (extrato/memo)</button>
+      <button class="opt" data-k="c">Um erro de digitação do cliente que confunde o tokenizador</button>
+      <p class="explain">Indireta = o modelo aceita input de fontes externas (arquivos/dados ingeridos). É a variante RAG; a instrução nem precisa ser visível a humanos, só ser parseada pelo modelo.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Onde vive o controle que impede o modelo de autorizar uma transferência?</p>
+      <button class="opt" data-k="a">No system prompt, instruindo o modelo a checar a permissão</button>
+      <button class="opt" data-k="b">No backend determinístico (complete mediation), não no modelo</button>
+      <button class="opt" data-k="c">No Bedrock Guardrails, que decide quem pode transferir o valor</button>
+      <p class="explain">LLM06 "complete mediation": autorize nos sistemas downstream, não confie no LLM. O prompt não é controle; guardrail é defesa probabilística, não autorização.</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://genai.owasp.org/llm-top-10/">OWASP — Top 10 for LLM Applications (2025)</a> e os arquivos <code>2_0_vulns/LLM0X_*.md</code> no GitHub do projeto. Os trechos de LLM01/06/08 desta lição são citações verbatim da fonte. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer um exercício de red-team (eu escrevo prompts de injeção direta e indireta e você desenha a defesa para cada um), ou o detalhamento de uma entrada específica do OWASP (LLM03/04/10) com mitigações verbatim? É só pedir. <strong>Próxima (Lição 16):</strong> gestão da janela de contexto em profundidade.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0014-arquitetura-multibackend.html">← 14 · Arquitetura multi-backend</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 15 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-13-seguranca-owasp.md">curso/modulo-13</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

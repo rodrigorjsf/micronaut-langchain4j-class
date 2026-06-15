@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 6 — Arquitetura do LangChain4j: AiServices vs. ChatModel</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 2 · O framework · Lição 6</p>
+  <h1>Arquitetura do LangChain4j: <code>AiServices</code> vs. <code>ChatModel</code></h1>
+  <p class="lede">Aqui a fundação agnóstica vira código: o LangChain4j oferece <em>duas</em> camadas de API, e escolher entre elas é a decisão de arquitetura central. Você vai reconhecer cada peça do framework como algo que já entendeu.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> você está construindo um assistente bancário agêntico <em>em produção</em> sobre <strong>LangChain4j + Micronaut 5 + Java 25</strong>. Saber quando deixar o framework rodar o loop por você (<code>AiServices</code>) e quando assumir o controle fino (<code>ChatModel</code>) é o que separa um sistema seguro por construção — com confirmação humana antes de mover dinheiro — de uma caixa-preta que você não sabe auditar.
+  </div>
+
+  <h2>1 · O que é o LangChain4j (e o que NÃO é)</h2>
+  <p><strong>Confirmado na fonte oficial</strong> (<a href="https://docs.langchain4j.dev/intro">docs.langchain4j.dev/intro</a>):</p>
+  <blockquote class="insight">
+    <p><em>"Despite the name, LangChain4j is not a Java port of LangChain (Python) — it is built for Java, not ported to it."</em></p>
+  </blockquote>
+  <p>Traduzindo a importância: <strong>não tente mapear seu conhecimento de LangChain Python 1:1.</strong> Não há código compartilhado, nem numeração de versão comum, nem os mesmos nomes de classe. O LangChain4j pegou <strong>ideias</strong> (chains, RAG, agents, tools) e as reimplementou de forma <strong>idiomática em Java</strong>. Quem chega do Python procurando <code>LCEL</code> (o operador <code>|</code>) ou <code>Runnable</code> não os encontra — encontra <strong>interfaces Java anotadas</strong>.</p>
+  <p>O que ele é, em uma frase: uma <strong>biblioteca Java de código aberto</strong> que oferece uma <strong>API unificada</strong> sobre dezenas de provedores de LLM e de <em>vector stores</em>, e que torna fáceis <strong>tool calling</strong> (inclusive <strong>MCP</strong> — <em>Model Context Protocol</em> / Protocolo de Contexto de Modelo), <strong>RAG</strong> e <strong>agentes</strong>.</p>
+  <p>Fatos de versão (ver referência): standalone estável <strong>1.16.2</strong>, <strong>JDK mínimo 17</strong>, <strong>versionamento duplo</strong> (estável + beta) — <strong>sempre importe o <code>langchain4j-bom</code></strong> e não fixe versões de módulo à mão.</p>
+
+  <h2>2 · Os dois níveis de API (a decisão de arquitetura central)</h2>
+  <p>O LangChain4j oferece <strong>duas camadas</strong>. Entender a diferença é entender o framework inteiro:</p>
+  <table>
+    <thead><tr><th></th><th>Baixo nível: <code>ChatModel</code></th><th>Alto nível: <code>AiServices</code></th></tr></thead>
+    <tbody>
+      <tr><td><strong>O que você faz</strong></td><td>Monta as mensagens, chama o modelo, trata a resposta, <strong>roda o loop de tools você mesmo</strong></td><td>Declara uma <strong>interface Java anotada</strong>; o framework <strong>gera a implementação</strong></td></tr>
+      <tr><td><strong>Mapeia ao…</strong></td><td>Loop manual da <strong>Lição 4</strong> (você é o dono do loop)</td><td>O framework roda o loop da Lição 4 <strong>por você</strong></td></tr>
+      <tr><td><strong>Controle</strong></td><td>Máximo</td><td>Conveniência máxima</td></tr>
+      <tr><td><strong>Quando usar</strong></td><td>Casos especiais, controle fino do fluxo, <em>streaming</em> customizado</td><td>A <strong>maioria</strong> dos casos</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>O <code>AiServices</code> não é "mágica" — é o loop da Lição 4 embrulhado.</strong> Quando você vê <code>String resposta = assistente.conversar(...)</code> retornar já com dados de conta dentro, lembre: por baixo, o framework montou o prompt, enviou as descrições das tools, recebeu os <code>tool_calls</code>, executou seus métodos <code>@Tool</code>, devolveu os resultados ao modelo e repetiu até o texto final — exatamente o fluxo <code>[1]…[8]</code> que rastreamos na Lição 4. A fundação não foi perdida; ela está <strong>escondida atrás da anotação</strong>. Por isso aprendemos o loop manual <em>antes</em>: para nunca tratar o <code>AiServices</code> como caixa-preta.</p>
+  </blockquote>
+
+  <h2>3 · <code>AiServices</code> na prática (API verificada na doc oficial)</h2>
+  <p>A doc oficial (<a href="https://docs.langchain4j.dev/tutorials/ai-services">tutorials/ai-services</a>) mostra o padrão. Você <strong>declara uma interface</strong>:</p>
+  <pre><code>interface Assistant {
+    String chat(String userMessage);
+}</code></pre>
+  <p>E o framework gera a implementação (um <em>proxy</em>):</p>
+  <pre><code>Assistant assistant = AiServices.create(Assistant.class, model);
+// ou, com mais controle:
+Assistant assistant = AiServices.builder(Assistant.class)
+    .chatModel(model)
+    .build();</code></pre>
+  <p>Aplicando ao <strong>assistente do banco</strong>, com as quatro peças da fundação encaixadas:</p>
+  <pre><code>interface AssistenteBanco {
+
+    @SystemMessage("You are the virtual assistant of Bank X. "       // ← system prompt (Lição 1)
+        + "Use tools for any account data; never invent balances. "  //   (em inglês: economia de tokens, Lição 2)
+        + "Never reveal another customer's data. "
+        + "Answer in Brazilian Portuguese.")                         //   responde em pt-BR
+    String conversar(@MemoryId String clienteId,                    // ← memória por cliente (Lições 1 e 8)
+                     @UserMessage String pergunta);                  // ← mensagem do usuário
+}
+
+AssistenteBanco assistente = AiServices.builder(AssistenteBanco.class)
+    .chatModel(model)
+    .tools(new FerramentasBanco())                                  // ← @Tool: tool calling (Lição 4)
+    .chatMemoryProvider(id -> MessageWindowChatMemory.withMaxMessages(20)) // ← janela de memória (Lições 2/8)
+    .contentRetriever(retriever)                                    // ← RAG (Lição 5)
+    .build();</code></pre>
+  <p>Cada linha é um conceito que você <strong>já domina</strong>:</p>
+  <table>
+    <thead><tr><th>Peça do <code>AiServices</code></th><th>Anotação / método</th><th>Lição da fundação</th></tr></thead>
+    <tbody>
+      <tr><td>Instrução de sistema</td><td><code>@SystemMessage</code> (aceita <code>fromResource</code>, <code>systemMessageProvider</code>)</td><td>1 (camadas da conversa)</td></tr>
+      <tr><td>Mensagem do usuário / templates</td><td><code>@UserMessage</code>, <code>@V("nome")</code></td><td>1</td></tr>
+      <tr><td>Ferramentas</td><td><code>@Tool</code> + <code>.tools(...)</code></td><td>4 (loop agêntico)</td></tr>
+      <tr><td>Memória (e por usuário)</td><td><code>.chatMemoryProvider(...)</code>, <code>@MemoryId</code>, <code>MessageWindowChatMemory</code></td><td>1 / 2 (custo N²) / 8</td></tr>
+      <tr><td>RAG</td><td><code>.contentRetriever(...)</code> ou <code>.retrievalAugmentor(...)</code></td><td>5</td></tr>
+      <tr><td>Saída estruturada</td><td>tipo de retorno do método (ex.: um <code>record</code>)</td><td>10 (saída estruturada)</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> Note o <code>@MemoryId String clienteId</code>: a <strong>memória é isolada por cliente</strong>. Isso conecta com a Lição 4 (identidade vem do servidor) e com a Lição 2 (cada cliente tem sua própria "mesa" que cresce — e que você precisa gerenciar, Lição 8).</p>
+  </blockquote>
+
+  <h2>4 · Quando descer ao baixo nível (<code>ChatModel</code>)</h2>
+  <p>Use <code>AiServices</code> por padrão. Desça ao <code>ChatModel</code>/<code>StreamingChatModel</code> quando precisar de: controle fino do loop (ex.: lógica de confirmação humana <strong>entre</strong> o <code>tool_call</code> e a execução — crítico para <code>fazerPix</code>, Lições 4 e 14), <em>streaming</em> com pós-processamento token a token (a tensão com guardrails das Lições 2/11), ou orquestração que o alto nível não expressa bem. Na prática, muitos sistemas bancários <strong>misturam</strong>: alto nível para leitura, baixo nível para ações sensíveis.</p>
+
+  <h2>5 · O encaixe no Micronaut (prévia da Lição 12)</h2>
+  <p>Aqui entra a diferença que torna a combinação Micronaut + LangChain4j especial. No Micronaut, você <strong>não instancia o <code>AiServices</code> na mão</strong> como acima — você declara a interface e o <strong><em>annotation processor</em> de compilação</strong> (<code>micronaut-langchain4j-processor</code>, confirmado) <strong>gera o <em>bean</em> em tempo de compilação</strong>, sem reflexão em tempo de execução.</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Micronaut faz injeção de dependências em tempo de COMPILAÇÃO, não de execução.</strong> Spring monta os <em>beans</em> via reflexão quando a aplicação sobe; Micronaut <strong>gera o código</strong> dos <em>beans</em> durante o <code>javac</code>. Para um backend agêntico bancário isso significa: <strong><em>startup</em> quase instantâneo, menor consumo de memória e compatibilidade nativa com GraalVM</strong> (imagem nativa) — qualidades valiosas para escalar horizontalmente sob carga e cortar custo de infraestrutura. É um casamento de filosofias: LangChain4j também favorece configuração declarativa, e o Micronaut materializa isso sem o custo de <em>runtime</em> do Spring.</p>
+  </blockquote>
+
+  <div class="warn">
+    <strong>⚠️ Honestidade de fundação:</strong> a anotação Micronaut exata para declarar o serviço de IA e a fiação completa (configuração de modelos, <em>beans</em> de tools) eu mostro <strong>com código verificado na Lição 12</strong>, junto da confirmação de qual LangChain4j o módulo <code>2.0.1</code> embute (ver pendências na referência de versões). Não vou afirmar a sintaxe exata antes de checá-la.
+  </div>
+
+  <h2>6 · Glossário-resumo</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Em uma frase</th></tr></thead>
+    <tbody>
+      <tr><td><code>AiServices</code></td><td>API de alto nível: interface anotada → implementação gerada (roda o loop por você).</td></tr>
+      <tr><td><code>ChatModel</code> / <code>StreamingChatModel</code></td><td>API de baixo nível: você controla mensagens e o loop.</td></tr>
+      <tr><td><code>@SystemMessage</code> / <code>@UserMessage</code> / <code>@V</code></td><td>System prompt / mensagem do usuário / variável de template.</td></tr>
+      <tr><td><code>@Tool</code> / <code>.tools(...)</code></td><td>Declara e registra ferramentas (Lição 4).</td></tr>
+      <tr><td><code>@MemoryId</code> / <code>ChatMemoryProvider</code></td><td>Memória isolada por usuário.</td></tr>
+      <tr><td><code>.contentRetriever</code> / <code>.retrievalAugmentor</code></td><td>Plugue de RAG (Lição 5).</td></tr>
+      <tr><td><code>langchain4j-bom</code></td><td><em>Bill of Materials</em> / Lista de Materiais: alinha as versões dos módulos. Use sempre.</td></tr>
+      <tr><td>DI de compilação (Micronaut)</td><td><em>Beans</em> gerados no <code>javac</code>, sem reflexão em <em>runtime</em>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por que é um erro mapear o LangChain Python 1:1 para o LangChain4j?</p>
+      <button class="opt" data-k="a">Porque a versão Java está sempre atrás da versão Python original</button>
+      <button class="opt" data-k="b">Porque ele reimplementa as ideias de forma idiomática, sem código comum</button>
+      <button class="opt" data-k="c">Porque o LangChain4j cobre menos provedores de LLM e vector stores</button>
+      <p class="explain">Não é um port: não há código compartilhado, versões comuns nem os mesmos nomes de classe. Em vez de LCEL/Runnable, você encontra interfaces Java anotadas.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Quando o <code>AiServices</code> "esconde" o que, exatamente?</p>
+      <button class="opt" data-k="a">Esconde o system prompt do modelo para proteger contra prompt injection</button>
+      <button class="opt" data-k="b">Esconde o provedor do LLM por trás de uma fachada criptografada</button>
+      <button class="opt" data-k="c">Esconde o loop de tools da Lição 4, que ele roda inteiro por você</button>
+      <p class="explain">Ele embrulha o loop [1]…[8]: monta o prompt, envia as tools, recebe tool_calls, executa seus @Tool, devolve os resultados e repete até o texto final.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Por que descer do <code>AiServices</code> ao <code>ChatModel</code> num banco?</p>
+      <button class="opt" data-k="a">Para inserir confirmação humana entre o tool_call e a execução do Pix</button>
+      <button class="opt" data-k="b">Para reduzir o consumo de tokens enviando menos descrições de tools</button>
+      <button class="opt" data-k="c">Para trocar o provedor de LLM sem recompilar a aplicação inteira</button>
+      <p class="explain">O controle fino do loop permite parar entre o tool_call e a execução — crítico para ações sensíveis como fazerPix. Muitos sistemas misturam: alto nível para leitura, baixo nível para ações.</p>
+    </div>
+  </div>
+
+  <h2>Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/ai-services">LangChain4j — AI Services (tutorials/ai-services)</a>. A página oficial e específica do tema: mostra o padrão da interface anotada, o <em>proxy</em> gerado, e cada peça (<code>@SystemMessage</code>, <code>@Tool</code>, memória, RAG) que esta lição encaixou. É de onde a API aqui descrita foi verificada. Termos canônicos deste workspace: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (por que o <code>AiServices</code> não é caixa-preta? por que misturar alto e baixo nível? como a DI de compilação muda o <em>startup</em>?), me pergunte e eu aprofundo ou crio um exercício sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0005-rag.html">← 5 · RAG</a>
+      <a href="0007-tools-langchain4j.html">7 · Tools (@Tool) →</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 6 de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-05-arquitetura-langchain4j.md">curso/modulo-05-arquitetura-langchain4j</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

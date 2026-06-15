@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 8 — ChatMemory e gestão da janela de contexto (200K + prompt caching)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 2 · LangChain4j · Lição 8</p>
+  <h1>ChatMemory e a gestão da janela de contexto</h1>
+  <p class="lede">O tema crítico: como reter histórico sem deixar o custo N² (Lição 2) explodir num orçamento de <strong>200K tokens</strong> — e como o <em>prompt caching</em> do Claude <strong>na Bedrock</strong> vira a alavanca direta contra esse custo.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> seu assistente bancário roda em <strong>Claude Sonnet (200K) via AWS Bedrock</strong> e reenvia o histórico a cada turno. Sem gestão de contexto e caching, a conta de inferência cresce em N² e o produto deixa de ser viável. Esta lição é, antes de tudo, <strong>engenharia de custo</strong>.
+  </div>
+
+  <h2>1 · O problema, consolidado</h2>
+  <p>Três fatos já provados se combinam: o modelo é <strong>sem estado</strong> (Lição 1) → <strong>reenviamos o histórico</strong> a cada turno → o custo cresce <strong>~N²</strong> (Lição 2) → e a janela é <strong>finita: 200K</strong> (entrada + saída, saída até 64K). A "mesa" enche, e cada token reenviado <strong>custa</strong>.</p>
+
+  <h2>2 · O orçamento de 200K: quem disputa a janela</h2>
+  <table>
+    <thead><tr><th>Componente</th><th>Tamanho (ilustrativo)</th><th>Natureza</th></tr></thead>
+    <tbody>
+      <tr><td>System prompt + descrições de dezenas de tools</td><td>~6.000</td><td><strong>Fixo</strong> (todo turno)</td></tr>
+      <tr><td>RAG: regras de produto</td><td>~3.000</td><td>Por pergunta</td></tr>
+      <tr><td>Histórico da conversa</td><td>~10.000 <strong>e crescendo</strong></td><td>Acumula (N²)</td></tr>
+      <tr><td>Resultado de tools (extrato, fatura)</td><td>~1.500 cada — podem ser enormes</td><td>Por chamada</td></tr>
+      <tr><td><strong>Reservado p/ saída</strong></td><td>até 64K</td><td>Disputa o mesmo orçamento</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Caber em 200K quase nunca é o problema — o custo é.</strong> Um turno típico usa ~20K de 200K: sobra espaço. A dor é que o <strong>bloco fixo de ~6K (system + tools) é reenviado a cada turno</strong> e o histórico cresce em N². Em pt-BR (que ainda infla tokens) × milhões de turnos/dia, é a maior conta recorrente. Gestão de contexto, num banco, é primariamente <strong>engenharia de custo</strong>.</p>
+  </blockquote>
+
+  <h2>3 · O menu de estratégias</h2>
+  <table>
+    <thead><tr><th>Estratégia</th><th>O que faz</th><th>Custo/benefício</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Janela de mensagens</strong></td><td>Últimas N mensagens</td><td>Simples; pode cortar contexto relevante</td></tr>
+      <tr><td><strong>Janela de tokens</strong></td><td>Últimos N tokens</td><td>Orçamento preciso; precisa contar tokens</td></tr>
+      <tr><td><strong>Sumarização</strong></td><td>Troca turnos antigos por resumo</td><td>Economiza tokens, mas <strong>reescreve o histórico</strong> (§5)</td></tr>
+      <tr><td><strong>RAG sobre o histórico</strong></td><td>Guarda tudo fora e recupera o relevante</td><td>Escala p/ conversas longas; +complexidade</td></tr>
+      <tr><td><strong>Enxugar resultados de tools</strong></td><td>Expira saídas antigas</td><td>Ataca os maiores consumidores</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4 · Prompt caching: a alavanca contra o N²</h2>
+  <p>Fato verificado (fonte 1.16.2 + docs AWS): no Bedrock, a <strong>leitura</strong> de cache é muito mais barata. A doc do <code>langchain4j-bedrock</code>/AWS cita números <strong>ilustrativos</strong> — até <strong>~90%</strong> de economia no custo de leitura e <strong>~85%</strong> menos latência —, mas o ganho real <strong>depende da taxa de reúso e da carga</strong>: meça no seu caso, não trate como garantia. A <strong>escrita</strong> pode custar <strong>mais</strong> que entrada normal — só compensa com reúso frequente dentro do TTL. O mínimo cacheável <strong>varia por modelo</strong>: <strong>4.096 tokens</strong> no Sonnet 4.5, <strong>1.024</strong> no Sonnet 4.6. Máximo de <strong>4 checkpoints</strong> por requisição. O bloco fixo de ~6K reenviado a todo turno é o candidato perfeito.</p>
+  <div class="warn">
+    <strong>Regra de ouro (prefix match):</strong> o cache casa por <strong>prefixo</strong> — qualquer byte alterado invalida o resto. Ordem de render: <code>tools → system → messages</code>. No Bedrock você marca um <strong>cachePoint explícito</strong> (ex.: <code>AFTER_SYSTEM</code>): tudo <em>antes</em> dele é cacheado — então ponha o <strong>estável primeiro</strong> (system congelado, tools determinísticas) e o <strong>volátil depois</strong> (a conversa). <strong>Nunca</strong> injete timestamp/UUID/"data de hoje" no system prompt — invalida o cache a cada requisição.
+  </div>
+
+  <h2>5 · A tensão: caching vs. sumarização</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Sumarizar e cachear puxam em direções opostas.</strong> A janela (mensagens/tokens) é <em>append-only</em>: você adiciona no fim, o prefixo fica byte-a-byte igual → <strong>o cache continua válido</strong> (~0,1×). Já a <strong>sumarização reescreve o meio</strong> (10 turnos → 1 resumo) → muda o prefixo → <strong>invalida o cache</strong> dali pra frente. Prática para o banco: <strong>janela + caching</strong> no caso comum; sumarize <strong>com parcimônia</strong>, só quando o custo da history crua superar o de quebrar o cache. Medir, não adivinhar.</p>
+  </blockquote>
+
+  <h2>6 · A API verificada (LangChain4j 1.16.2)</h2>
+  <p><code>ChatMemory</code> (<code>dev.langchain4j.memory</code>) tem <code>add</code>, <code>messages()</code> e <code>clear()</code>. Duas janelas (<code>dev.langchain4j.memory.chat</code>):</p>
+  <ul>
+    <li><code>MessageWindowChatMemory.withMaxMessages(int)</code> — últimas N mensagens.</li>
+    <li><code>TokenWindowChatMemory.withMaxTokens(int, TokenCountEstimator)</code> — últimos N tokens. <strong>Prefira esta no orçamento de 200K</strong> (o despejo acompanha o custo real em tokens).</li>
+  </ul>
+  <p>Despejo é <strong>mais antigo primeiro</strong> e indivisível. Dois comportamentos automáticos que evitam bugs sérios:</p>
+  <ul>
+    <li><strong>A <code>SystemMessage</code> é fixada e nunca despejada</strong> — guardrails do banco sobrevivem (e é a mesma <code>SystemMessage</code> que você vai cachear: <em>pinning</em> + caching se reforçam).</li>
+    <li><strong>Resultado de tool órfão é despejado junto</strong> da sua <code>AiMessage</code> — evita o erro "resultado de tool sem o pedido".</li>
+  </ul>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Ponto de atenção verificado (vazamento de memória) —</span> <strong>O <code>AiServices</code> retém TODA <code>ChatMemory</code> que já criou.</strong> Cada cliente que conversa uma vez deixa a memória presa para sempre. A correção: a interface estende <code>ChatMemoryAccess</code> (<code>getChatMemory</code>, <strong><code>evictChatMemory(memoryId)</code></strong>) — chame ao fim da conversa. Bônus: esse método é a sua ferramenta para o <strong>direito ao esquecimento (LGPD)</strong>.</p>
+  </blockquote>
+
+  <h3>Contagem de tokens no Bedrock: estime local, confira remoto</h3>
+  <div class="warn">
+    <strong>O <code>langchain4j-bedrock</code> 1.16.2 não traz contador de tokens</strong> (verificado). A AWS tem a operação <code>CountTokens</code> (IAM <code>bedrock:CountTokens</code>), mas é <strong>remota</strong> — cara para chamar a cada <code>add</code> na memória. Logo, para a <code>TokenWindowChatMemory</code> ao vivo use um <code>TokenCountEstimator</code> <strong>local/aproximado</strong> e reserve o <code>CountTokens</code> da AWS para verificação ocasional. Não há tokenizador offline do Claude; um estimador local <strong>subconta</strong> ~15–20% — deixe folga no <code>maxTokens</code>. O <strong>consumo real</strong> (incl. cache) volta na resposta: faça <em>cast</em> de <code>chatResponse.metadata().tokenUsage()</code> para <code>BedrockTokenUsage</code> e leia <code>cacheReadInputTokens()</code>.
+  </div>
+
+  <h3>Prompt caching no <code>langchain4j-bedrock</code> — a resposta de produção</h3>
+  <div class="warn">
+    <strong>Armadilha de provedor (verificada):</strong> <code>cacheSystemMessages(true)</code>/<code>cacheTools(true)</code> são métodos <strong>reais</strong>, mas do módulo <code>langchain4j-anthropic</code> (API direta) — no caminho <strong>Bedrock eles não existem e têm efeito ZERO</strong>. Compila e não cacheia nada. É o erro "parece certo" que só a fonte pega.
+  </div>
+  <p><strong>O jeito Bedrock</strong> (verificado em <code>BedrockChatRequestParameters</code> @ 1.16.2): um <em>cachePoint</em> via <code>defaultRequestParameters</code>:</p>
+  <pre><code>BedrockChatModel model = BedrockChatModel.builder()
+    .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0")   // inference profile cross-region
+    .region(Region.US_EAST_1)
+    .defaultRequestParameters(BedrockChatRequestParameters.builder()
+        .promptCaching(BedrockCachePointPlacement.AFTER_SYSTEM, // cacheia tools+system (o prefixo fixo)
+                       CacheTTL.VALUE_5_M)                       // VALUE_5_M / VALUE_1_H (enum do AWS SDK)
+        .build())
+    .build();</code></pre>
+  <p><strong>TTL por modelo (verificado, docs AWS):</strong> o TTL padrão de <strong>5 min</strong> (<code>CacheTTL.VALUE_5_M</code>) é universal; o TTL estendido de <strong>1 h</strong> (<code>CacheTTL.VALUE_1_H</code>) existe <strong>só</strong> em Claude Opus 4.5, Haiku 4.5 e <strong>Sonnet 4.5</strong> — <strong>não</strong> em Sonnet 4.6 nem Opus 4.6 (5 min apenas). Escolher <code>VALUE_1_H</code> num modelo sem suporte não estende o cache.</p>
+  <p>Confirme via <code>BedrockTokenUsage.cacheReadInputTokens()</code> (após <em>cast</em> do <code>tokenUsage()</code>) — se ficar em zero, o prefixo não atingiu o mínimo do modelo (4.096 tok no Sonnet 4.5) ou há um invalidador silencioso. Use <code>AFTER_SYSTEM</code> com uma <code>SystemMessage</code> do core: a janela de memória não trata a <code>BedrockSystemMessage</code> granular, então o cachePoint por <em>placement</em> é o caminho confiável com memória.</p>
+
+  <h2>7 · O assistente do banco: memória + caching + privacidade</h2>
+  <pre><code>BedrockChatModel model = BedrockChatModel.builder()
+    .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+    .region(Region.US_EAST_1)
+    .defaultRequestParameters(BedrockChatRequestParameters.builder()
+        .promptCaching(BedrockCachePointPlacement.AFTER_SYSTEM, CacheTTL.VALUE_5_M)
+        .build())
+    .build();
+
+interface AssistenteBanco extends ChatMemoryAccess {           // poder de despejar/esquecer
+    @SystemMessage("You are the assistant of Bank X. Use tools for account data; "
+        + "never reveal another customer's data. Answer in Brazilian Portuguese.")
+    String conversar(@MemoryId String clienteId, @UserMessage String pergunta);
+}
+
+AssistenteBanco assistente = AiServices.builder(AssistenteBanco.class)
+    .chatModel(model)
+    .tools(new FerramentasBanco(contaService))
+    .chatMemoryProvider(clienteId -> TokenWindowChatMemory.builder()
+        .id(clienteId)
+        .maxTokens(20_000, estimadorLocalBarato)   // bem abaixo de 200K; estimador LOCAL (não o remoto)
+        .chatMemoryStore(redisStore)               // durável por clienteId (PII em repouso!)
+        .build())
+    .build();
+
+// ... ao encerrar a conversa (ou sob pedido de LGPD):
+assistente.evictChatMemory(clienteId);             // libera memória e/ou "esquece" o cliente</code></pre>
+  <p>Cada peça resolve um problema da estratégia: <code>TokenWindowChatMemory(20_000)</code> controla o N² e cabe folgado em 200K; o <code>promptCaching(AFTER_SYSTEM)</code> do Bedrock derruba o custo do prefixo fixo; <code>redisStore</code> dá durabilidade (ao custo de PII em repouso — Lição 13); <code>evictChatMemory</code> resolve vazamento <strong>e</strong> direito ao esquecimento.</p>
+
+  <h2>8 · Pratique</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Num orçamento de 200K, qual o problema real da gestão de contexto?</p>
+      <button class="opt" data-k="a">Fazer a conversa caber dentro da janela finita</button>
+      <button class="opt" data-k="b">O custo: prefixo fixo reenviado e história em N²</button>
+      <button class="opt" data-k="c">Impedir que o modelo acesse turnos já encerrados</button>
+      <p class="explain">Caber raramente é o gargalo; o custo recorrente (prefixo + N²) é.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Qual ajuste do BedrockChatModel ataca diretamente o custo N²?</p>
+      <button class="opt" data-k="a">A janela de tokens com o maxTokens reduzido ao limite</button>
+      <button class="opt" data-k="b">O cacheSystemMessages(true), herdado da API da Anthropic</button>
+      <button class="opt" data-k="c">O promptCaching(AFTER_SYSTEM) cacheando o prefixo fixo</button>
+      <p class="explain">cacheSystemMessages é do langchain4j-anthropic (no-op no Bedrock). No Bedrock, o cachePoint AFTER_SYSTEM faz a leitura do prefixo custar muito menos a cada turno.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Como contar tokens da janela ao vivo no Claude-via-Bedrock?</p>
+      <button class="opt" data-k="a">Estimador local barato; o CountTokens da AWS só para conferir</button>
+      <button class="opt" data-k="b">Um tokenizador offline oficial do Claude embutido no SDK</button>
+      <button class="opt" data-k="c">Chamando a API CountTokens da AWS a cada add na memória</button>
+      <p class="explain">Não há tokenizador offline do Claude e o langchain4j-bedrock não conta tokens; o CountTokens da AWS é remoto. Estime local na janela, confira remoto de vez em quando.</p>
+    </div>
+  </div>
+
+  <h2>9 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/chat-memory">LangChain4j — Chat Memory (doc oficial)</a>, complementada pela doc da <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html">AWS Bedrock — Prompt caching</a> (cachePoint, mínimos por modelo, TTL e burndown de cota). API conferida na <a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-bedrock/src/main/java/dev/langchain4j/model/bedrock/BedrockChatRequestParameters.java">fonte 1.16.2</a>. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver um cálculo do ganho de caching (com e sem) nos números do banco, ou desenhar o <code>redisStore</code> com criptografia de PII? É só pedir.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0007-tools-langchain4j.html">← 7 · Tools (@Tool)</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 8 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-07-chatmemory-contexto.md">curso/modulo-07</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

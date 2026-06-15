@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@Tool API cheat-sheet — LangChain4j 1.16.2</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Referência · Cheat-sheet · Parte B do Módulo 6</p>
+  <h1>@Tool API cheat-sheet — LangChain4j 1.16.2</h1>
+  <p class="lede">Cartão de referência denso da API <code>@Tool</code> / <code>@P</code> / <code>@ToolMemoryId</code>: símbolos verificados contra o código-fonte da tag <code>1.16.2</code> — anotações, tipos de retorno, tratamento de erros e fontes.</p>
+
+  <h2>1 · As três anotações</h2>
+  <pre><code>import dev.langchain4j.agent.tool.Tool;          // @Tool   (no método)
+import dev.langchain4j.agent.tool.P;             // @P      (no parâmetro)
+import dev.langchain4j.agent.tool.ToolMemoryId;  // @ToolMemoryId (no parâmetro)</code></pre>
+
+  <table>
+    <thead><tr><th>Anotação</th><th>Atributos verificados (1.16.2)</th><th>Notas</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong><code>@Tool</code></strong></td>
+        <td><code>String name()</code> (padrão = nome do método); <code>String[] value()</code> (a <strong>DESCRIÇÃO</strong>, várias entradas juntadas em multilinha); e três <code>@Experimental</code>: <code>returnBehavior()</code> (padrão <code>TO_LLM</code>), <code>searchBehavior()</code>, <code>metadata()</code></td>
+        <td><code>@Target(METHOD)</code></td>
+      </tr>
+      <tr>
+        <td><strong><code>@P</code></strong></td>
+        <td><code>description()</code> / <code>value()</code> (<strong>aliases</strong> — use um), <code>name()</code>, <code>boolean required()</code> <strong>padrão <code>true</code></strong>, <code>defaultValue()</code></td>
+        <td><code>@Target(PARAMETER)</code></td>
+      </tr>
+      <tr>
+        <td><strong><code>@ToolMemoryId</code></strong></td>
+        <td>(sem atributos) injeta o <em>memory id</em> no parâmetro</td>
+        <td>par com <code>@MemoryId</code> do AI Service</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Pegadinha verificada (não erre isto) —</span> <strong><code>@Tool.value()</code> é a DESCRIÇÃO, não o nome — e é um <code>String[]</code>, não <code>String</code>.</strong> O nome é <code>@Tool.name()</code>, que por padrão é o nome do método. Muita gente (e muitos tutoriais) trocam os dois. E <strong>todo parâmetro <code>@P</code> é obrigatório por padrão</strong> (<code>required = true</code>); para torná-lo opcional, use <code>@P(required = false)</code>, um <code>defaultValue</code>, ou um <code>Optional&lt;T&gt;</code>.</p>
+  </blockquote>
+
+  <h2>2 · Tipos permitidos e como o retorno chega ao modelo</h2>
+  <p><strong>Parâmetros:</strong> primitivos, <em>boxed</em> (<code>Integer</code>…), <strong>enums</strong>, POJOs e <strong>records</strong> (inclusive aninhados), tipos polimórficos (<code>sealed</code>), <code>List</code>/<code>Set</code>/<code>Map</code>, <code>Optional&lt;T&gt;</code> (torna opcional), ou <strong>zero</strong> parâmetros. Parâmetros injetados pelo framework (<code>@ToolMemoryId</code>) <strong>não</strong> são preenchidos pelo modelo.</p>
+  <p><strong>Retorno</strong> (verificado no javadoc de <code>Tool.java</code>): o método pode retornar <strong>qualquer</strong> tipo, inclusive <code>void</code>.</p>
+
+  <table>
+    <thead><tr><th>Retorno</th><th>O que é enviado ao modelo</th></tr></thead>
+    <tbody>
+      <tr><td><code>void</code></td><td>a string literal <code>"Success"</code></td></tr>
+      <tr><td><code>String</code></td><td>enviada <strong>como está</strong> (sem conversão)</td></tr>
+      <tr><td>qualquer outro (record, POJO, <code>Map</code>, coleção…)</td><td><strong>serializado em JSON</strong></td></tr>
+      <tr><td>multimodal (<code>Image</code>, <code>Content</code>…)</td><td>enviado como conteúdo multimodal (só em alguns provedores — <em>docs</em>)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3 · Exemplo: tools reais com identidade injetada</h2>
+  <pre><code>class FerramentasBanco {
+
+    private final ContaService contas;   // sua camada determinística (auth, roteamento de backend)
+
+    @Tool("Returns the credit card invoice (amount in BRL, due date ISO-8601) for the "
+        + "authenticated customer's CURRENT cycle. Use for the current invoice; "
+        + "do NOT use for past months.")
+    FaturaResumo getFaturaCartao(@ToolMemoryId String clienteId) {        // ← identidade INJETADA, não vinda do modelo
+        return contas.faturaAtual(clienteId);                            //   retorna um record pequeno → vira JSON
+    }
+
+    @Tool("Returns the account balance for the authenticated customer.")
+    SaldoResumo getSaldo(@ToolMemoryId String clienteId,
+                         @P("Account scope to query") TipoConta tipoConta) {  // ← enum restringe os valores
+        return contas.saldo(clienteId, tipoConta);
+    }
+}
+
+record FaturaResumo(double valor, String moeda, String vencimento, String status) {}
+record SaldoResumo(double saldo, String moeda) {}
+enum TipoConta { NACIONAL, GLOBAL }</code></pre>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong><code>@ToolMemoryId</code> é exatamente a "identidade vem do servidor, nunca do modelo".</strong> O <code>clienteId</code> declarado em <code>conversar(@MemoryId String clienteId, ...)</code> — que <strong>você</strong> vincula à sessão autenticada — flui automaticamente para o <code>@ToolMemoryId String clienteId</code> da tool. <strong>O modelo nunca toca nesse valor</strong>; ele só escolhe <code>tipoConta</code>. A garantia vem de <strong>você</strong> fazer <code>memoryId = identidade autenticada</code> — o framework só transporta; a segurança é da sua decisão de <em>binding</em>.</p>
+  </blockquote>
+
+  <h2>4 · Tratamento de erros (e as travas do banco)</h2>
+  <table>
+    <thead><tr><th>Situação</th><th>Padrão na linha 1.x (verificado)</th><th>O que fazer no banco</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong><code>@Tool</code> lança exceção</strong></td>
+        <td>AiServices <strong>captura</strong> e envia <code>e.getMessage()</code> ao modelo (para ele se corrigir). <strong>Não</strong> propaga ao chamador.</td>
+        <td>⚠️ <strong>Vaza dado interno/PII</strong> para o modelo e a conversa. <strong>Sobrescreva</strong> com <code>toolExecutionErrorHandler</code> e devolva mensagem <strong>sanitizada</strong>; logue a causa real via <code>context.rawError()</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Argumentos inválidos</strong> (JSON malformado, obrigatório faltando)</td>
+        <td>Caminho <strong>separado</strong>; padrão é <strong>lançar/abortar</strong></td>
+        <td>Trate com <code>toolArgumentsErrorHandler</code> (retornar texto para o modelo tentar de novo, ou abortar).</td>
+      </tr>
+      <tr>
+        <td><strong>Tool alucinada</strong> (nome inexistente)</td>
+        <td><code>hallucinatedToolNameStrategy</code> → padrão <code>THROW_EXCEPTION</code> (aborta)</td>
+        <td>Forneça um <code>Function</code> que devolva <code>ToolExecutionResultMessage.from(req, "...")</code> para o modelo se recuperar.</td>
+      </tr>
+      <tr>
+        <td><strong>Loop sem fim</strong></td>
+        <td><code>maxToolCallingRoundTrips(int)</code> → <strong>padrão 100</strong></td>
+        <td>Reduza para um teto sensato (ex.: 6–8) para limitar custo.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Montando o assistente com essas travas (API verificada):</p>
+  <pre><code>AssistenteBanco assistente = AiServices.builder(AssistenteBanco.class)
+    .chatModel(model)
+    .tools(new FerramentasBanco(contaService))
+    .chatMemoryProvider(id -> MessageWindowChatMemory.withMaxMessages(20))
+    .maxToolCallingRoundTrips(8)                              // teto de loop (padrão 100)
+    .toolExecutionErrorHandler((error, ctx) -> {             // NUNCA vaze e.getMessage() ao modelo
+        log.error("Tool falhou", ctx.rawError());            // causa real só no log do servidor
+        return ToolErrorHandlerResult.text("A operação não pôde ser concluída agora.");
+    })
+    .hallucinatedToolNameStrategy(req ->
+        ToolExecutionResultMessage.from(req, "Error: no tool called " + req.name()))
+    .build();</code></pre>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Ponto de atenção verificado (armadilha do null) —</span> <strong>Na linha 1.x, um parâmetro-objeto obrigatório que falta é passado como <code>null</code> SILENCIOSAMENTE</strong> (só primitivos faltando lançam <code>ToolArgumentsException</code>). Num banco, isso significa que um <code>accountId</code> nulo pode entrar na sua tool sem erro. <strong>Valide objetos críticos defensivamente dentro do corpo da tool</strong> — não confie no <code>@P(required=true)</code> para garantir presença. (Isso, e os padrões de erro acima, estão <strong>marcados para mudar no LangChain4j 2.0</strong> — reconfirme na sua versão fixada.)</p>
+  </blockquote>
+
+  <h2>5 · <code>ReturnBehavior</code>, registro e tools dinâmicas</h2>
+  <ul>
+    <li><strong><code>ReturnBehavior</code></strong> (<code>@Experimental</code>): <code>TO_LLM</code> (padrão — resultado volta ao modelo, loop continua) vs. <code>IMMEDIATE</code>/<code>IMMEDIATE_IF_LAST</code> (curto-circuita e devolve o resultado direto ao chamador; exige tipo de retorno <code>Result</code> no método do AI Service). Qualquer erro de tool <strong>desliga</strong> o retorno imediato.</li>
+    <li><strong>Registro</strong> — <code>.tools(Object...)</code> / <code>.tools(Collection)</code> é o caminho recomendado (anotações). Existem também <code>.tools(List&lt;AiServiceTool&gt;)</code> e <code>.tools(Map&lt;ToolSpecification, ToolExecutor&gt;)</code> para o caminho programático.</li>
+    <li><strong>Tools dinâmicas</strong> — <code>.toolProvider(ToolProvider)</code> resolve o problema de "muitas tools": você expõe <strong>só</strong> as tools relevantes ao turno (o <em>tool retrieval</em>/RAG-sobre-tools), em vez de despejar dezenas de descrições na mesa. Conecta com <strong>MCP</strong>.</li>
+  </ul>
+
+  <div class="warn">
+    <strong>Pendência do Módulo 10 (Micronaut):</strong> sem a opção <code>-parameters</code> do <code>javac</code>, a reflexão vê <code>arg0</code>/<code>arg1</code> em vez do nome real do parâmetro — por isso Quarkus e Spring ativam <code>-parameters</code> por padrão. Para o Micronaut (DI de compilação), confirme se o <em>annotation processor</em> já preserva os nomes ou se você deve usar <code>@P(name = "...")</code>.
+  </div>
+
+  <h2>6 · Fontes (verificadas)</h2>
+  <p><strong>Código-fonte tag 1.16.2:</strong></p>
+  <ul class="fine">
+    <li><a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/Tool.java"><code>Tool.java</code></a></li>
+    <li><a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/P.java"><code>P.java</code></a></li>
+    <li><a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/ToolMemoryId.java"><code>ToolMemoryId.java</code></a></li>
+    <li><a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/agent/tool/ReturnBehavior.java"><code>ReturnBehavior.java</code></a></li>
+    <li><a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j/src/main/java/dev/langchain4j/service/AiServices.java"><code>AiServices.java</code></a></li>
+  </ul>
+  <p class="fine"><a href="https://docs.langchain4j.dev/tutorials/tools/">Doc oficial — Tools</a> · <a href="https://www.anthropic.com/engineering/writing-tools-for-agents">Anthropic — Writing tools for agents</a> · <a href="https://developers.openai.com/api/docs/guides/function-calling">OpenAI — Function calling</a></p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Dúvida sobre algum símbolo?</strong> Eu sou seu tutor neste workspace — se qualquer atributo, padrão ou comportamento de erro ficou nebuloso, me pergunte e eu abro o código-fonte da tag fixada com você.</div>
+    <p class="fine">Cheat-sheet de referência · workspace <code>/teach</code> · pt-BR · símbolos aterrados na tag <code>1.16.2</code>. Fonte: <a href="../curso/modulo-06-tools-design.md">curso/modulo-06-tools-design.md</a> (Parte B).</p>
+  </footer>
+
+</div>
+</body>
+</html>

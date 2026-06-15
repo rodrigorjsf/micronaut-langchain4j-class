@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 18 — Escala e resiliência: retries, throttling, quotas, fallback (Claude-on-Bedrock)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 4 · Produção, Segurança e Escala · Lição 18</p>
+  <h1>Escala e resiliência: retries, throttling, quotas e fallback</h1>
+  <p class="lede">Produção bancária é feita de picos, throttling e falhas inevitáveis. Esta lição mostra o que o LangChain4j + Bedrock fazem por você em resiliência — e, sobretudo, o que <strong>fica por sua conta</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> sob carga, o assistente vai tomar 429 (throttling). Como o sistema reage — quantas vezes tenta de novo, quanto tempo leva, se cai para um modelo mais barato, e se um retry pode <em>reexecutar uma transferência</em> — decide custo, latência e correção. Resiliência é arquitetura, não um flag.
+  </div>
+
+  <h2>1 · Retries: duas camadas EMPILHADAS</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Toda chamada atravessa DOIS retries empilhados.</strong> (1) O do <strong>LangChain4j</strong>: <code>BedrockChatModel.maxRetries</code> (default <strong>2</strong> → até 3 tentativas), backoff base 500ms. (2) O do <strong>AWS SDK v2</strong> por baixo: <code>retry_mode=standard</code>, <code>max_attempts=3</code> — o <code>createClient</code> <strong>não</strong> sobrescreve a estratégia do SDK. Sob throttling sustentado, as tentativas <strong>multiplicam</strong> e a latência <strong>compõe</strong>. (Os números do "retry 2026" da AWS — base 1000ms, token bucket — são <strong>opt-in</strong>, atrás de <code>AWS_NEW_RETRIES_2026=true</code>.)</p>
+  </blockquote>
+  <p><strong>Retriado</strong> (<code>RetriableException</code>): <strong>429</strong> → <code>RateLimitException</code>; <strong>5xx</strong> → <code>InternalServerException</code>; <strong>408</strong> → <code>TimeoutException</code>. <strong>Falha rápido</strong> (<code>NonRetriableException</code>): 404 (model id errado), 400 (validação), 401/403 (auth). <strong>Streaming não tem retry no LangChain4j</strong> (só o do SDK).</p>
+
+  <h2>2 · A armadilha do timeout</h2>
+  <div class="warn">
+    <code>apiCallTimeout</code> (default 1 min) cobre <strong>uma</strong> chamada <code>converse()</code> (com os retries internos do SDK) — <strong>não</strong> o loop externo do LangChain4j. Logo o pior caso é <strong>~3 × 60s + backoff</strong>, não 60s totais. Para limitar o tempo <strong>total</strong>, imponha o teto na <strong>camada da app</strong> (ou reduza <code>maxRetries</code>).
+  </div>
+
+  <h2>3 · Capacidade: on-demand vs. cross-region vs. Provisioned Throughput</h2>
+  <table>
+    <thead><tr><th>Modo</th><th>O que é</th><th>Quando</th></tr></thead>
+    <tbody>
+      <tr><td><strong>On-demand</strong></td><td>capacidade compartilhada por Região; cota <strong>por tokens/min (TPM)</strong>; throttla com 429</td><td>tráfego variável</td></tr>
+      <tr><td><strong>Inference profile cross-region</strong> (<code>us./eu./apac./global</code>)</td><td>roteia entre Regiões; <strong>cota TPM separada</strong></td><td>absorver picos</td></tr>
+      <tr><td><strong>Provisioned Throughput</strong></td><td>reserva <strong>Model Units</strong> (hora; termos no-commit/1m/6m); capacidade garantida</td><td>baseline estável (e obrigatório p/ modelo custom)</td></tr>
+    </tbody>
+  </table>
+  <p>Cotas do <code>bedrock-runtime</code> são <strong>por modelo, por Região, por token</strong> (input+output somados); "dia" = TPM × 1440; <strong>RPM é específico por modelo</strong> (alguns, como Claude Opus, não têm RPM). <strong>No banco:</strong> baseline da conta-nacional → PT; tráfego global esporádico → on-demand + perfil.</p>
+
+  <h2>4 · O que o framework NÃO dá</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Não há <code>FallbackChatModel</code>, <code>RateLimiter</code> nem circuit breaker no LangChain4j 1.16.2</strong> — só a <strong>exceção</strong> <code>RateLimitException</code>. Fallback (primário → alternativo: outro modelId/Região/modelo mais barato) e rate limiting são padrões <strong>da app/infra</strong> (interceptor Micronaut, semáforo, API gateway). O modo <strong>adaptive</strong> do AWS SDK adiciona um rate limiter client-side, mas é <strong>por instância de client</strong> — num design multi-tenant de client compartilhado, ele atrasa <strong>todos</strong> os tenants. Resiliência avançada é arquitetura sua.</p>
+  </blockquote>
+  <p class="fine">Auto-config do micronaut-langchain4j 2.0.1 <strong>não</strong> expõe <code>maxRetries</code> → mantém o default 2; para ajustar, forneça um <code>BedrockRuntimeClient</code> próprio ou um <code>@Factory</code>. E lembre da <strong>assimetria de versão</strong> (Lição 12): 2.0.1 fixa 1.15.1.</p>
+
+  <h2>5 · Idempotência sob retries empilhados (a joia)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Os retries empilhados podem REEXECUTAR uma transferência.</strong> Uma única ação do usuário pode disparar várias tentativas (LangChain4j × SDK). Portanto operações que movem dinheiro <strong>têm</strong> de carregar <strong>idempotency key</strong> + <strong>confirmação explícita</strong>, para que um retry <strong>nunca</strong> debite duas vezes (cf. Lições 12/14). Resiliência sem idempotência, num banco, é duplicar dinheiro.</p>
+  </blockquote>
+  <pre><code>@Factory class BankResilienceFactory {
+    @Singleton @Named("primary") BedrockChatModel primary() {        // Builder 1.16.2 não expõe credentialsProvider → usa DefaultCredentialsProvider
+        return BedrockChatModel.builder().region(Region.US_EAST_1)
+            .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0") // perfil cross-region (id canônico do curso)
+            .maxRetries(2).timeout(Duration.ofSeconds(20)).build();
+    }
+    @Singleton @Named("fallback") BedrockChatModel fallback() {
+        return BedrockChatModel.builder().region(Region.US_EAST_1)
+            .modelId("us.anthropic.claude-haiku-4-5-20251001-v1:0")  // mais barato/rápido
+            .maxRetries(1).timeout(Duration.ofSeconds(15)).build();
+    }
+}
+
+ChatResponse ask(ChatRequest req) {
+    try { return primary.chat(req); }
+    catch (RateLimitException e) { return fallback.chat(req); }   // fallback app-level
+}
+
+TransferResult confirmTransfer(TransferCommand cmd, String idempotencyKey) {
+    if (repo.alreadyExecuted(idempotencyKey)) return repo.resultFor(idempotencyKey); // sem débito duplo
+    return repo.executeOnce(idempotencyKey, cmd);                 // após confirmação explícita
+}</code></pre>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Quantas camadas de retry uma chamada Bedrock atravessa no LangChain4j?</p>
+      <button class="opt" data-k="a">Uma só, o maxRetries do BedrockChatModel na chamada</button>
+      <button class="opt" data-k="b">Duas, empilhadas: a do LangChain4j sobre a do AWS SDK</button>
+      <button class="opt" data-k="c">Nenhuma por padrão; o retry é sempre opt-in explícito</button>
+      <p class="explain">maxRetries=2 do LangChain4j (até 3 tentativas) roda SOBRE o retry do AWS SDK (standard, max_attempts=3). createClient não sobrescreve a estratégia do SDK; as tentativas multiplicam.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. O 1.16.2 traz classe de fallback de modelo e rate limiter?</p>
+      <button class="opt" data-k="a">Sim: as classes FallbackChatModel e RateLimiter no core</button>
+      <button class="opt" data-k="b">Não: só a exceção RateLimitException; fallback/limite é seu</button>
+      <button class="opt" data-k="c">Sim, mas apenas dentro do módulo langchain4j-bedrock</button>
+      <p class="explain">Só existe a exceção RateLimitException. Fallback e rate limiting são padrões da app/infra (interceptor, semáforo, gateway); o adaptive do SDK é por-client.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Por que uma transferência precisa de idempotency key mesmo com confirmação?</p>
+      <button class="opt" data-k="a">Porque os retries empilhados podem reexecutar a chamada</button>
+      <button class="opt" data-k="b">Porque o Bedrock cobra em dobro por chamada repetida</button>
+      <button class="opt" data-k="c">Porque o virtual thread duplica a tarefa ao fazer fork</button>
+      <p class="explain">Uma ação pode gerar várias tentativas (LangChain4j × AWS SDK). Sem idempotency key, um retry reexecuta o débito. A chave + confirmação garantem execução única.</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> docs AWS de <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-runtime.html">quotas runtime</a>, <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/prov-throughput.html">Provisioned Throughput</a> e <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html">retry behavior</a>. Fonte 1.16.2: <code>BedrockChatModel</code> (<code>maxRetries</code>), <code>RetryUtils</code>, <code>ExceptionMapper</code> (429 → RateLimit). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer um cálculo do pior-caso de latência/tentativas (LangChain4j × SDK) sob throttling, ou um interceptor Micronaut de rate-limit por cliente para conter denial-of-wallet? É só pedir. <strong>Próxima (Lição 19):</strong> o ecossistema honesto — Java vs. Python.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0017-observabilidade.html">← 17 · Observabilidade</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 18 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-16-escala-resiliencia.md">curso/modulo-16</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 2 — Anatomia de uma chamada a um LLM</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 1 · Sem framework · Lição 2</p>
+  <h1>Anatomia de uma chamada a um LLM</h1>
+  <p class="lede">Na Lição 1 entendemos <em>o que</em> um LLM é. Aqui abrimos o capô: o que realmente acontece — e o que realmente custa — em <strong>uma única chamada</strong>. Token, janela de contexto, parâmetros, custo, latência e streaming.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> você está construindo um assistente bancário agêntico <em>em produção</em> sobre <strong>LangChain4j + Micronaut 5 + Java 25</strong>. Tudo o que o framework fará em Java é, no fundo, <em>automatizar e gerenciar bem este fluxo</em> — sem perder o controle sobre tokens, custo, latência e o que entra na mesa. Sem dominar a chamada crua, "gestão de janela de contexto" seria decorada, não compreendida.
+  </div>
+
+  <h2>1 · Token e tokenização: a moeda do sistema</h2>
+  <p>Na Lição 1 dissemos que o LLM "prevê o próximo token". Agora: <strong>o que é um token?</strong></p>
+  <p>Um <strong>token</strong> não é uma palavra nem uma letra — é um <strong>pedaço de texto</strong> (uma <em>subword</em>, "subpalavra"). Os modelos usam um algoritmo de <strong>tokenização</strong> (geralmente <strong>BPE</strong>, <em>Byte Pair Encoding</em> / Codificação por Pares de Bytes) que quebra o texto em pedaços frequentes.</p>
+  <p>Heurística prática (para inglês): <strong>1 token ≈ 4 caracteres ≈ ¾ de uma palavra</strong>. Exemplos aproximados:</p>
+  <table>
+    <thead><tr><th>Texto</th><th>Tokens (aprox.)</th><th>Por quê</th></tr></thead>
+    <tbody>
+      <tr><td><code>Pix</code></td><td>1</td><td>palavra curta e frequente</td></tr>
+      <tr><td><code>agendamento</code></td><td>3–4</td><td>palavra longa, quebrada em pedaços</td></tr>
+      <tr><td><code>R$ 2.310,55</code></td><td>5–7</td><td>dígitos e pontuação tokenizam mal</td></tr>
+      <tr><td><code>clienteId=987654321</code></td><td>8–11</td><td>IDs numéricos viram muitos tokens</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Dois fatos com consequências diretas no banco:</strong></p>
+    <p><strong>1. Português custa mais que inglês.</strong> Os tokenizadores são treinados majoritariamente em inglês, então o mesmo significado em português costuma gastar <strong>mais tokens</strong> (frequentemente 15–30% a mais). Seu assistente brasileiro é, por construção, mais caro por mensagem — isso muda cálculos de custo e de janela de contexto.</p>
+    <p><strong>2. Números e IDs são "caros" e frágeis.</strong> <code>clienteId=987654321</code> explode em muitos tokens, e o modelo <em>raciocina mal sobre dígitos</em> (ele vê pedaços, não o número). Por isso <strong>nunca</strong> confie no LLM para fazer aritmética financeira ou comparar valores monetários "de cabeça" — isso é trabalho do seu código (tool), não do modelo. O modelo <em>orquestra</em>; a calculadora é determinística.</p>
+  </blockquote>
+
+  <h2>2 · A janela de contexto, agora em números</h2>
+  <p>A "mesa de trabalho" da Lição 1 tem um tamanho medido em tokens, e ela é <strong>compartilhada entre entrada e saída</strong>:</p>
+  <pre><code>janela de contexto = tokens de ENTRADA (prompt)  +  tokens de SAÍDA (resposta)</code></pre>
+  <ul>
+    <li><strong>Tokens de entrada (<em>prompt tokens</em>):</strong> system prompt + descrições das tools + histórico + resultados de tools + a pergunta.</li>
+    <li><strong>Tokens de saída (<em>completion tokens</em>):</strong> o que o modelo gera.</li>
+  </ul>
+  <p>Se a janela é, digamos, de 128 mil tokens e sua entrada já ocupa 125 mil, sobram só 3 mil para a resposta — mesmo que o modelo "saiba" responder mais. <strong>Entrada e saída disputam o mesmo orçamento.</strong> Esse é o coração da Lição 16.</p>
+
+  <h2>3 · Os parâmetros que você controla</h2>
+  <p>Cada chamada tem "botões". Os que mais importam:</p>
+  <table>
+    <thead><tr><th>Parâmetro</th><th>O que faz</th><th>Recomendação no banco</th></tr></thead>
+    <tbody>
+      <tr><td><strong>temperature</strong> (temperatura)</td><td>Aleatoriedade da escolha do próximo token. <code>0</code> ≈ mais determinístico/previsível; valores altos ≈ mais criativo/variado.</td><td><strong>Baixa</strong> (ex.: 0–0,3) para respostas factuais e transacionais. Você não quer criatividade ao informar um saldo.</td></tr>
+      <tr><td><strong>top_p</strong> (amostragem por núcleo)</td><td>Alternativa à temperatura: limita a escolha aos tokens que somam <code>p</code> de probabilidade.</td><td>Ajuste <strong>um</strong> dos dois (temperature <em>ou</em> top_p), não ambos.</td></tr>
+      <tr><td><strong>max_tokens</strong></td><td>Teto de tokens da <strong>saída</strong>.</td><td>Defina sempre — controla custo, latência e evita respostas que estouram a janela.</td></tr>
+      <tr><td><strong>stop sequences</strong> (sequências de parada)</td><td>Texto que faz o modelo parar de gerar.</td><td>Útil para cortar respostas em formatos específicos.</td></tr>
+      <tr><td><strong>seed</strong> (semente)</td><td>Tenta tornar a saída reproduzível.</td><td>Knob <strong>da OpenAI</strong> — <strong>não existe no Bedrock/Claude</strong> (caminho deste curso). Mesmo onde existe, <strong>não garante</strong> determinismo total (ver seção 7).</td></tr>
+    </tbody>
+  </table>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Por que temperatura baixa no banco?</strong> "Sua fatura fechou em R$ 2.310,55, vence em 20/06" não admite variação. Já um assistente de <em>brainstorm</em> de marketing se beneficiaria de temperatura alta. O parâmetro deve seguir a <strong>tarefa</strong>.</p>
+  </blockquote>
+
+  <h2>4 · Custo: por que gestão de contexto É gestão de custo</h2>
+  <p>A cobrança é <strong>por token</strong>, e quase sempre com preços <strong>diferentes</strong> para entrada e saída — <strong>saída costuma custar várias vezes mais</strong> que entrada.</p>
+  <div class="warn">
+    Os números abaixo são <strong>ilustrativos</strong> (preços reais variam por provedor e mudam com frequência; não os trate como fato). Servem para mostrar a <em>mecânica</em>.
+  </div>
+  <p>Suponha (ilustrativo): entrada a US$ 3,00 por milhão de tokens, saída a US$ 15,00 por milhão. Um turno típico do assistente:</p>
+  <table>
+    <thead><tr><th>Componente</th><th>Tokens</th></tr></thead>
+    <tbody>
+      <tr><td>System prompt + descrições de todas as tools</td><td>~500</td></tr>
+      <tr><td>Histórico da conversa</td><td>~800</td></tr>
+      <tr><td>Resultado de tools (extrato + fatura)</td><td>~1.200</td></tr>
+      <tr><td>Pergunta do cliente</td><td>~30</td></tr>
+      <tr><td><strong>Total de entrada</strong></td><td><strong>~2.530</strong></td></tr>
+      <tr><td>Resposta gerada</td><td>~250 (saída)</td></tr>
+    </tbody>
+  </table>
+  <p>Custo ≈ (2.530 × US$3 + 250 × US$15) / 1.000.000 ≈ <strong>US$ 0,0114</strong> por turno. Parece nada — mas <strong>multiplique por milhões de turnos/dia</strong> e por uma conversa que reenvia o histórico crescente a cada mensagem (limitação "sem estado" da Lição 1!), e o custo explode de forma <strong>quadrática</strong> ao longo de uma conversa longa.</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>A armadilha do "sem estado" vira uma conta de luz.</strong> Como o modelo não tem memória, reenviamos o histórico inteiro a cada turno. Numa conversa de N mensagens, o turno N reenvia ~N mensagens. Somando todos os turnos, o custo cresce com <strong>N²</strong>, não com N. É por isso que "gestão da janela de contexto" (Lição 16) não é refinamento acadêmico — é a diferença entre um produto viável e um que queima dinheiro. As técnicas (resumir o passado, recuperar só o relevante, janelas de memória) são, na prática, <strong>estratégias de custo</strong>.</p>
+  </blockquote>
+
+  <h2>5 · Latência: por que demora, e onde demora</h2>
+  <p>Uma chamada tem duas fases com características distintas:</p>
+  <ol>
+    <li><strong>Prefill (pré-preenchimento):</strong> o modelo "lê" toda a entrada. Custa proporcional ao <strong>tamanho da entrada</strong>. É o que determina o <strong>TTFT</strong> (<em>Time To First Token</em> / Tempo Até o Primeiro Token).</li>
+    <li><strong>Decode (geração):</strong> o modelo produz a saída <strong>um token por vez</strong>, em sequência. Custa proporcional ao <strong>tamanho da saída</strong>, medido em <strong>tokens por segundo</strong>.</li>
+  </ol>
+  <p>Implicações no banco:</p>
+  <ul>
+    <li>Um system prompt gigante e um histórico enorme <strong>atrasam o primeiro token</strong> (prefill longo) — o cliente encara a tela "pensando...".</li>
+    <li>Uma resposta longa <strong>atrasa o fim</strong> (decode é sequencial e não paraleliza por token).</li>
+    <li>Encadear várias tools (Lição 4) significa <strong>várias chamadas em série</strong> → latências que se somam. O assistente que compara CDB e financiamento pode fazer 3–4 viagens ao modelo.</li>
+  </ul>
+
+  <h2>6 · Streaming: a resposta token a token</h2>
+  <p>Como o decode é sequencial, podemos <strong>transmitir cada token assim que sai</strong> (<em>streaming</em>), em vez de esperar a resposta inteira. É por isso que chats de IA "digitam" na sua frente.</p>
+  <p>Benefício: <strong>TTFT percebido</strong> despenca — o cliente vê texto surgindo rápido, mesmo que a resposta completa demore. É quase puramente uma vitória de <strong>experiência do usuário (UX)</strong>.</p>
+  <div class="warn">
+    <strong>Tensão que reaparece na Lição 11 (guardrails):</strong> se você já está <em>mostrando</em> os tokens ao cliente, você <strong>ainda não validou a resposta completa</strong>. Como aplicar um <em>guardrail</em> de saída (ex.: "nunca revele o número completo do cartão") sobre algo que já está aparecendo na tela? Streaming e validação de saída brigam entre si — um trade-off de arquitetura real, não um detalhe.
+  </div>
+
+  <h2>7 · Determinismo: o mesmo prompt, respostas diferentes</h2>
+  <p>Por padrão, LLMs são <strong>não determinísticos</strong>: a mesma entrada pode gerar saídas diferentes (por causa da amostragem probabilística e de detalhes de hardware/ponto flutuante). Mesmo com <code>temperature=0</code>, a reprodutibilidade <strong>total não é garantida</strong> — e o <code>seed</code>, que ajudaria, é um parâmetro <strong>da OpenAI</strong>, <strong>indisponível</strong> no Bedrock/Claude.</p>
+  <p>Consequência prática (que detalhamos adiante — avaliação de agentes, tema à parte desta trilha): você <strong>não pode</strong> testar um agente como testa uma função pura com <code>assertEquals</code>. Testar IA exige outra mentalidade — avaliação por critérios, <em>LLM-as-judge</em> (LLM como juiz), conjuntos de avaliação — porque a "resposta certa" é uma faixa, não um valor único.</p>
+
+  <h2>8 · Juntando tudo: a anatomia de um turno do banco</h2>
+  <p>Cliente digita: <em>"Quanto foi minha última fatura e quanto rende meu CDB?"</em></p>
+  <ol>
+    <li><strong>Montagem do prompt (entrada):</strong> system prompt (~500) + descrições das tools (já dentro dos 500) + histórico (~800) + pergunta (~30).</li>
+    <li><strong>1ª chamada → prefill + decode:</strong> o modelo decide chamar <strong>duas</strong> tools (<code>getFaturaCartao</code>, <code>getRendimentoCDB</code>). TTFT depende dos ~1.330 tokens de entrada.</li>
+    <li><strong>Seu código executa as tools</strong> (backends diferentes — cartão e investimentos), devolve ~1.200 tokens de resultado.</li>
+    <li><strong>2ª chamada → prefill maior</strong> (agora com os resultados na mesa, ~2.530 tokens) <strong>+ decode</strong> da resposta final (~250 tokens, possivelmente em streaming).</li>
+    <li><strong>Custo e latência</strong> = soma das duas viagens. <strong>Note:</strong> a mesa cresceu, a próxima pergunta partirá de uma base ainda maior.</li>
+  </ol>
+  <p>Tudo o que faremos em LangChain4j (Parte 2) é, no fundo, <strong>automatizar e gerenciar bem esse fluxo</strong> — sem perder o controle sobre tokens, custo, latência e o que entra na mesa.</p>
+
+  <h2>9 · Glossário-resumo</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Em uma frase</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Token</strong></td><td>Pedaço de texto (subpalavra); unidade de processamento e de cobrança.</td></tr>
+      <tr><td><strong>Tokenização / BPE</strong></td><td>Algoritmo que quebra texto em tokens.</td></tr>
+      <tr><td><strong>Prompt tokens / completion tokens</strong></td><td>Tokens de entrada / de saída; disputam a mesma janela.</td></tr>
+      <tr><td><strong>temperature</strong></td><td>Botão de aleatoriedade; baixa = previsível, alta = criativa.</td></tr>
+      <tr><td><strong>max_tokens</strong></td><td>Teto da saída; controla custo e latência.</td></tr>
+      <tr><td><strong>TTFT</strong> (Tempo Até o Primeiro Token)</td><td>Atraso até o primeiro token; dominado pela fase de prefill.</td></tr>
+      <tr><td><strong>Prefill / Decode</strong></td><td>Ler a entrada / gerar a saída token a token.</td></tr>
+      <tr><td><strong>Streaming</strong></td><td>Transmitir tokens conforme saem; melhora a UX percebida.</td></tr>
+      <tr><td><strong>Não determinismo</strong></td><td>Mesmo prompt pode gerar saídas diferentes.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Pratique</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por que seu assistente em português tende a custar mais por mensagem que um em inglês?</p>
+      <button class="opt" data-k="a">Porque o provedor cobra uma taxa extra por idioma não nativo</button>
+      <button class="opt" data-k="b">Porque o mesmo sentido em português gasta mais tokens que em inglês</button>
+      <button class="opt" data-k="c">Porque o modelo precisa traduzir cada frase antes de responder ao cliente</button>
+      <p class="explain">Os tokenizadores são treinados majoritariamente em inglês; o mesmo significado em português costuma gastar 15–30% mais tokens.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Por que o custo de uma conversa longa cresce de forma ~quadrática (N²)?</p>
+      <button class="opt" data-k="a">Porque a saída fica mais cara a cada token gerado pelo modelo</button>
+      <button class="opt" data-k="b">Porque a temperatura sobe sozinha conforme a conversa avança nos turnos</button>
+      <button class="opt" data-k="c">Porque, sem memória, reenviamos o histórico inteiro a cada novo turno</button>
+      <p class="explain">A limitação "sem estado" da Lição 1: o turno N reenvia ~N mensagens; somando todos os turnos, o custo cresce com N².</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Qual fase domina o TTFT (Tempo Até o Primeiro Token) de uma chamada?</p>
+      <button class="opt" data-k="a">O prefill, em que o modelo lê toda a entrada antes de gerar</button>
+      <button class="opt" data-k="b">O decode, em que o modelo produz a saída um token por vez</button>
+      <button class="opt" data-k="c">O streaming, em que cada token é transmitido assim que sai</button>
+      <p class="explain">O prefill lê a entrada inteira; seu custo é proporcional ao tamanho da entrada e determina o tempo até o primeiro token.</p>
+    </div>
+  </div>
+
+  <h2>Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://platform.claude.com/docs/en/docs/build-with-claude/context-windows">Anthropic — Context windows</a>. Documentação oficial que descreve a janela de contexto como "memória de trabalho" compartilhada entre entrada e saída, o acúmulo progressivo de tokens a cada turno e como estimar uso com a API de contagem de tokens — exatamente a mecânica desta lição. Termos canônicos deste workspace: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (por que o custo cresce com N²? como prefill e decode afetam a latência? por que streaming briga com guardrails de saída?), me pergunte e eu aprofundo ou crio um exercício sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0001-modelo-mental.html">← 1 · Modelo mental</a>
+      <a href="0003-tokenizacao-ptbr.html">3 · Tokenização pt-BR →</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 2 de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-02-anatomia-chamada-llm.md">curso/modulo-02</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

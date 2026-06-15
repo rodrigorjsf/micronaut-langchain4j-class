@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 16 — Gestão da janela de contexto em profundidade</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 4 · Produção, Segurança e Escala · Lição 16</p>
+  <h1>Gestão da janela de contexto em profundidade</h1>
+  <p class="lede">A <a href="0008-chatmemory-contexto.html">Lição 8</a> deu o problema (custo N², 200K) e as duas janelas. Aqui vamos <strong>a fundo</strong>: o que o LangChain4j 1.16.2 <strong>de fato</strong> entrega — e o que você <strong>tem de construir</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> em conversas longas de suporte bancário, a estratégia de memória decide custo, latência <em>e correção</em>. Saber que o framework só entrega janelas por recência — e que sumarização e recuperação seletiva são <strong>suas</strong> — evita ensinar (e construir) um recurso que não existe.
+  </div>
+
+  <h2>1 · O que o 1.16.2 realmente traz</h2>
+  <ul>
+    <li><code>ChatMemory</code> (interface, <strong>core</strong>): <code>id()</code>, <code>add()</code>, <code>messages()</code>, <code>set()</code>, <code>clear()</code>. O <strong>core não traz nenhuma implementação</strong> de janela ou sumarização.</li>
+    <li><code>MessageWindowChatMemory</code> e <code>TokenWindowChatMemory</code> vivem no <strong>agregador <code>dev.langchain4j:langchain4j</code></strong> (não no core) — dependa do agregador para tê-las.</li>
+    <li><code>dynamicMaxTokens</code>/<code>dynamicMaxMessages</code> e <code>alwaysKeepSystemMessageFirst</code> <strong>existem</strong> em 1.16.2 — mas <strong>não são novos</strong> (idênticos já em 1.15.0). Ensine "disponíveis", não "novos".</li>
+  </ul>
+
+  <h2>2 · Embutido vs. "você constrói"</h2>
+  <table>
+    <thead><tr><th>Estratégia (Lição 8)</th><th>Em 1.16.2</th></tr></thead>
+    <tbody>
+      <tr><td>Janela por mensagem / por token</td><td><strong>embutido</strong> (Message/Token WindowChatMemory)</td></tr>
+      <tr><td><strong>Sumarização / compactação</strong></td><td><strong>NÃO existe</strong> (zero <code>Summariz*</code>/<code>Compact*</code> na árvore) → <strong>você constrói</strong></td></tr>
+      <tr><td><strong>RAG sobre o histórico</strong> (recuperação seletiva)</td><td><strong>NÃO é tipo de memória</strong> → <strong>você compõe</strong> (store + EmbeddingStore)</td></tr>
+      <tr><td>Enxugar resultados de tools</td><td>app-level (molde retornos pequenos — Lição 7)</td></tr>
+    </tbody>
+  </table>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>As duas memórias embutidas são janelas por RECÊNCIA — nada mais.</strong> Não há <code>SummarizingChatMemory</code> nem memória apoiada em embeddings. "Recuperar o turno <strong>relevante</strong>, não só o <strong>recente</strong>" exige compor à mão: <strong>persistir o histórico completo num <code>ChatMemoryStore</code></strong> e <strong>indexar/recuperar</strong> via <code>EmbeddingStore</code> + <code>ContentRetriever</code> (Lição 9). O framework dá as peças; a estratégia avançada é sua.</p>
+  </blockquote>
+
+  <h2>3 · Orçamento de tokens no Bedrock (a peça que falta)</h2>
+  <p><code>TokenWindowChatMemory</code> <strong>exige</strong> um <code>TokenCountEstimator</code> (<code>ensureNotNull</code>). Há <strong>7 implementações de provedor</strong> (OpenAi, AzureOpenAi, Gemini×2, Anthropic, Watsonx, HuggingFace) — <strong>nenhuma para Bedrock</strong>.</p>
+  <div class="warn">
+    <code>BedrockChatModel</code> <strong>só</strong> implementa <code>ChatModel</code> — sem tokenizador Claude local. O <code>AnthropicTokenCountEstimator</code> é <strong>armadilha</strong> (API <strong>direta</strong> da Anthropic, remota, <code>@Experimental</code> — não serve no Bedrock). A AWS tem o <code>CountTokens</code> remoto, mas o <code>langchain4j-bedrock 1.16.2</code> <strong>não o adapta</strong> — chame o AWS SDK direto. <strong>No Bedrock, você fornece</strong> o <code>TokenCountEstimator</code> (local na janela ao vivo; <code>CountTokens</code> para conferência).
+  </div>
+
+  <h2>4 · Eviction é lossy — estado durável fica FORA da janela</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>A janela deslizante esquece por recência — e isso é perigoso num banco.</strong> Um detalhe citado há muitos turnos (qual é a conta nacional vs. global; um <strong>token de confirmação/idempotência</strong> de uma operação que move dinheiro) pode <strong>cair fora da janela</strong>. <strong>Nunca conte que ele permanece lá.</strong> Persista esse estado <strong>durável</strong> na sua aplicação/store e recupere-o à parte. A janela é para <em>fluência de conversa</em>, não para <em>estado de negócio</em>. (Verificado: ao evictar um <code>AiMessage</code> com <code>ToolExecutionRequest</code>, os <code>ToolExecutionResultMessage</code> órfãos saem junto — automático.)</p>
+  </blockquote>
+
+  <h2>5 · Construindo o avançado (esboço)</h2>
+  <pre><code>// No Bedrock, TokenWindowChatMemory exige um TokenCountEstimator da APLICAÇÃO.
+final class AppApproxTokenCountEstimator implements TokenCountEstimator {
+    public int estimateTokenCountInText(String t) { return t == null ? 0 : Math.max(1, t.length()/4); }
+    public int estimateTokenCountInMessage(ChatMessage m) { return estimateTokenCountInText(m.toString()); }
+    public int estimateTokenCountInMessages(Iterable&lt;ChatMessage&gt; ms) {
+        int total = 0; for (ChatMessage m : ms) total += estimateTokenCountInMessage(m); return total;
+    }
+}
+
+ChatMemoryProvider memoryProvider(ChatMemoryStore durableStore, TokenCountEstimator estimator) {
+    return memoryId -&gt; TokenWindowChatMemory.builder()
+            .id(memoryId)
+            .maxTokens(2000, estimator)             // exige estimator no Bedrock
+            .chatMemoryStore(durableStore)           // durável (NÃO InMemoryChatMemoryStore em prod)
+            .alwaysKeepSystemMessageFirst(true)      // disponível em 1.16.2 (não novo)
+            .build();
+}
+// Sumarização e RAG-sobre-histórico: construídos pela app (sumarizar quebra o cache — Lição 8).</code></pre>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. O LangChain4j 1.16.2 traz uma ChatMemory de sumarização pronta?</p>
+      <button class="opt" data-k="a">Sim, a SummarizingChatMemory dentro do módulo core</button>
+      <button class="opt" data-k="b">Não: só janelas por mensagem/token; sumarização é sua</button>
+      <button class="opt" data-k="c">Sim, mas apenas no agregador dev.langchain4j:langchain4j</button>
+      <p class="explain">Busca recursiva na árvore 1.16.2: zero arquivos Summariz*/Compact*. As únicas memórias são as duas janelas por recência. Sumarização é construída pela aplicação.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. Um token de confirmação emitido há 30 turnos ainda está na janela?</p>
+      <button class="opt" data-k="a">Sim: a janela sempre retém o que for marcado importante</button>
+      <button class="opt" data-k="b">Talvez não: a janela é por recência e lossy — persista fora</button>
+      <button class="opt" data-k="c">Sim, desde que se use TokenWindow em vez de MessageWindow</button>
+      <p class="explain">As duas janelas evictam por recência (lossy). Estado de negócio durável (token de confirmação, escopo nacional/global) deve viver fora da janela, na sua app/store.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>3. Para TokenWindowChatMemory no Bedrock, de onde vem a contagem de tokens?</p>
+      <button class="opt" data-k="a">De um tokenizador Claude local embutido no BedrockChatModel</button>
+      <button class="opt" data-k="b">Do AnthropicTokenCountEstimator, que serve direto no Bedrock</button>
+      <button class="opt" data-k="c">De um TokenCountEstimator que você fornece (não há um Bedrock)</button>
+      <p class="explain">Não há estimador Bedrock nem tokenizador Claude local. O Anthropic é remoto/API-direta (armadilha). Forneça um estimador local; use o CountTokens da AWS para conferir.</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/chat-memory">LangChain4j — Chat Memory (doc oficial)</a>, complementada pela <a href="https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_CountTokens.html">AWS — CountTokens</a>. Fonte 1.16.2: <code>MessageWindowChatMemory</code>/<code>TokenWindowChatMemory</code> (agregador), <code>TokenCountEstimator</code> (core); ausência verificada de sumarização/RAG-de-memória na árvore. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer que eu desenhe a sumarização-que-preserva-cache (resumir só o miolo, manter o prefixo estável) ou o pipeline de RAG-sobre-histórico (store durável + EmbeddingStore) ponta a ponta? É só pedir. <strong>Próxima (Lição 17):</strong> observabilidade.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0015-seguranca-owasp.html">← 15 · Segurança e OWASP</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 16 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-14-contexto-a-fundo.md">curso/modulo-14</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

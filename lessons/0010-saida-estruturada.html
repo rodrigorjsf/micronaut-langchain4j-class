@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 10 — Saída estruturada: do texto livre ao objeto tipado (mas não-confiável)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 2 · LangChain4j · Lição 10</p>
+  <h1>Saída estruturada: do texto livre ao objeto tipado</h1>
+  <p class="lede">O agente já <em>busca</em> (tools, RAG) e <em>lembra</em> (memory). Agora a <strong>forma</strong> da saída: como fazer o <code>AiService</code> devolver um <strong>objeto tipado</strong> que o backend do banco pode rotear e decidir — e por que ele é <strong>tipado, mas ainda não-confiável</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> o backend agêntico precisa <em>decidir</em> ("isto é um Pix ou uma dúvida de tarifa?", "o valor é R$ 100,00?"). Decisão pede <strong>dado tipado</strong>, não uma frase. Esta lição entrega <strong>um ganho</strong>: uma triagem em <code>record</code> que o seu código roteia — com a fronteira clara de que <strong>tipado ≠ confiável</strong>.
+  </div>
+
+  <h2>1 · Texto livre vs. objeto tipado</h2>
+  <p>Texto livre serve para <strong>mostrar</strong> ao cliente. Mas o backend precisa <strong>decidir</strong> e <strong>persistir</strong> — e isso pede uma saída que o código consiga inspecionar com segurança de tipos.</p>
+  <table>
+    <thead><tr><th>Você quer…</th><th>Forma da saída</th></tr></thead>
+    <tbody>
+      <tr><td>Exibir uma resposta ao cliente</td><td><code>String</code> (texto livre)</td></tr>
+      <tr><td><strong>Rotear / decidir / persistir</strong> no backend</td><td><strong>POJO/record tipado</strong> (saída estruturada)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2 · O tipo de retorno <em>é</em> o contrato</h2>
+  <p>No <code>AiServices</code> 1.16.2, <strong>o tipo de retorno do método dirige tudo</strong> (verificado em <code>DefaultAiServices</code>). Não há anotação <code>@Json</code> nem <code>responseFormat</code> por chamada.</p>
+  <ul>
+    <li>Suportados: <code>boolean/int/long/double</code>, <code>BigDecimal</code>, <code>LocalDate</code>/<code>LocalDateTime</code>, <strong>enum</strong>, <code>List&lt;T&gt;</code>/<code>Set&lt;T&gt;</code> e, por padrão, <strong>POJO/record</strong>.</li>
+    <li><code>@Description</code> (FQN <code>dev.langchain4j.model.output.structured.Description</code>, <code>@Target({FIELD, TYPE})</code>) descreve campos/classe para o schema — <strong>não</strong> mira parâmetros de método.</li>
+    <li><code>Result&lt;T&gt;</code> embrulha o tipo com <code>content()</code>, <code>tokenUsage()</code>, <code>sources()</code> (os <em>chunks</em> do RAG — Lição 9), <code>finishReason()</code>. Dirige o <strong>mesmo</strong> schema do <code>T</code>.</li>
+  </ul>
+  <div class="warn">
+    <strong>Armadilha verificada:</strong> <code>Map</code> é degenerado — não há <code>MapOutputParser</code>, e <code>schemaNotRequired(Map.class)</code> pula schema <strong>e</strong> prompt. <strong>Use um POJO/record concreto.</strong>
+  </div>
+
+  <h2>3 · Os dois caminhos do AiServices (e só dois)</h2>
+  <p>O <code>DefaultAiServices</code> escolhe entre <strong>exatamente duas</strong> estratégias. (Não há um terceiro caminho via <em>tool-use</em> para saída por tipo de retorno — <em>tool-use</em> é <em>function calling</em>, outro mecanismo.)</p>
+  <table>
+    <thead><tr><th>Caminho</th><th>Quando</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr><td><strong>(A) JSON schema nativo</strong></td><td><code>supportsJsonSchema()</code> &amp; <code>!streaming</code> &amp; há schema</td><td>monta <code>ResponseFormat.type(JSON).jsonSchema(...)</code> — restringe a geração</td></tr>
+      <tr><td><strong>(B) JSON por prompt</strong></td><td>capability ausente <strong>ou</strong> sem schema</td><td><strong>em silêncio</strong> anexa uma instrução textual — <strong>zero garantia</strong></td></tr>
+    </tbody>
+  </table>
+  <p><code>supportsJsonSchema()</code> = <code>chatModel.supportedCapabilities().contains(RESPONSE_FORMAT_JSON_SCHEMA)</code>. O <code>ResponseFormatType</code> tem <strong>só</strong> <code>TEXT</code> e <code>JSON</code> — "schema nativo" é <code>type(JSON)</code> <strong>+</strong> um <code>JsonSchema</code> não-nulo.</p>
+
+  <h2>4 · Bedrock: o opt-in obrigatório (e o fallback silencioso)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>O gêmeo do <code>cacheSystemMessages</code> da Lição 8.</strong> Por padrão, o <code>BedrockChatModel</code> <strong>não anuncia</strong> a capability <code>RESPONSE_FORMAT_JSON_SCHEMA</code> (<code>copy(null) = Set.of()</code>). Resultado: o <code>AiServices</code> <strong>cai no fallback por prompt em silêncio</strong> — sem warning, sem exceção. Você acha que tem schema forçado; tem só uma "sugestão" de formato. De novo: <em>compila e não faz o que você acha</em> — só a fonte primária pega.</p>
+  </blockquote>
+  <p>A correção — <strong>opt-in explícito</strong>:</p>
+  <pre><code>ChatModel model = BedrockChatModel.builder()
+    .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+    .region(Region.US_EAST_1)
+    .supportedCapabilities(Capability.RESPONSE_FORMAT_JSON_SCHEMA)  // sem isto: fallback silencioso
+    .build();</code></pre>
+  <p>Com o opt-in, o caminho nativo do Converse monta <code>OutputConfig.textFormat(OutputFormat.type(JSON_SCHEMA)...)</code> — <strong>separado</strong> do <code>.guardrailConfig(...)</code> (saída e guardrails são ortogonais; guardrails são a Lição 11). Pedir JSON sem schema lança <code>UnsupportedFeatureException</code>. Comportamento provado pelo teste de integração <code>BedrockAiServiceWithJsonSchemaIT</code> (com <code>us.anthropic.claude-haiku-4-5-20251001-v1:0</code>).</p>
+
+  <h2>5 · O assistente do banco: triagem tipada</h2>
+  <pre><code>enum Intencao { CONSULTA, PIX, PAGAMENTO_BOLETO, FORA_DE_ESCOPO }
+
+record Triagem(
+        Intencao intencao,
+        @Description("produto citado, ex.: CDB, cartao, Pix; senao null") String produto,
+        @Description("valor em reais se houver; senao null")              BigDecimal valor,
+        @Description("resumo em pt-BR da intencao do cliente")            String resumo
+) {}
+
+interface Triador {
+    @UserMessage("Classifique a mensagem do cliente do banco: {{msg}}")
+    Triagem triar(@V("msg") String msg);
+
+    // Variante com metadados (tokenUsage, sources do RAG, finishReason):
+    @UserMessage("Classifique: {{msg}}")
+    Result&lt;Triagem&gt; triarComMetadados(@V("msg") String msg);
+}
+
+ChatModel model = BedrockChatModel.builder()
+        .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+        .region(Region.US_EAST_1)
+        .supportedCapabilities(Capability.RESPONSE_FORMAT_JSON_SCHEMA) // opt-in!
+        .build();
+
+Triador triador = AiServices.create(Triador.class, model);
+Triagem t = triador.triar(mensagemDoCliente);
+
+// t é TIPADO, mas NÃO-CONFIÁVEL. NUNCA aja só porque o modelo classificou "PIX":
+if (t.intencao() == Intencao.PIX) {
+    // valide o valor, confirme com o cliente e AUTORIZE na camada determinística
+    // (Lição 1 + Lição 11). O tipo garante a FORMA, não a VERDADE nem a permissão.
+}</code></pre>
+
+  <h2>6 · Tipado ≠ confiável (a ponte para a Lição 11)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Saída estruturada garante a FORMA, nunca a VERDADE — nem a autorização.</strong> O schema faz o JSON <em>casar com o record</em>; ele <strong>não</strong> garante que <code>valor</code> é o correto, que <code>intencao</code> é honesta, ou que o cliente <strong>pode</strong> fazer aquilo. O caminho nativo restringe a geração, mas ainda é <strong>probabilístico</strong>; o fallback por prompt <strong>não restringe nada</strong>. Trate o POJO parseado como <strong>entrada não-confiável</strong>: valide regras de negócio e <strong>autorize no seu código</strong> (determinístico) antes de agir. É o princípio da Lição 1 — e o gancho da <strong>Lição 11</strong> (guardrails + moderação), a <em>rede de defesa</em> sobre esta saída.</p>
+  </blockquote>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. O que define o formato da saída estruturada no AiServices?</p>
+      <button class="opt" data-k="a">Uma anotação @Json aplicada ao método do AI Service</button>
+      <button class="opt" data-k="b">O tipo de retorno do método (record, POJO ou enum)</button>
+      <button class="opt" data-k="c">Um parâmetro responseFormat passado em cada chamada</button>
+      <p class="explain">O DefaultAiServices lê o returnType do método e gera o schema/parser a partir dele — não há @Json nem responseFormat por chamada.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. No Bedrock, sem o opt-in da capability de JSON schema, o que ocorre?</p>
+      <button class="opt" data-k="a">O AiServices lança UnsupportedFeatureException já no build</button>
+      <button class="opt" data-k="b">Ele usa o schema nativo do Converse assim mesmo, por padrão</button>
+      <button class="opt" data-k="c">Cai em JSON por prompt, em silêncio, sem nenhuma garantia</button>
+      <p class="explain">supportedCapabilities default = Set.of() → fallback silencioso. Opte por .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA) para o schema nativo.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Recebeu um record tipado e válido do modelo. Pode confiar nele?</p>
+      <button class="opt" data-k="a">Não: é entrada não-confiável; valide e autorize no seu código</button>
+      <button class="opt" data-k="b">Sim: o schema garante que os valores são corretos e seguros</button>
+      <button class="opt" data-k="c">Sim, desde que o Bedrock Guardrails esteja ativo na chamada</button>
+      <p class="explain">O tipo garante FORMA, não VERDADE nem permissão. E nem guardrail é autorização (Lição 1/11): valide e autorize na camada determinística.</p>
+    </div>
+  </div>
+
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/structured-outputs">LangChain4j — Structured Outputs (doc oficial)</a>. API conferida na fonte <a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j/src/main/java/dev/langchain4j/service/DefaultAiServices.java">1.16.2 (<code>DefaultAiServices</code>)</a> e na <a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-bedrock/src/main/java/dev/langchain4j/model/bedrock/BedrockChatModel.java"><code>BedrockChatModel</code></a> (o opt-in de capability). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver o JSON Schema que o <code>@Description</code> gera para o <code>record Triagem</code>, ou o <code>Result&lt;Triagem&gt;</code> trazendo as <code>sources()</code> do RAG da Lição 9 para citar a fonte? É só pedir. <strong>Próxima (Lição 11):</strong> guardrails + moderação — defendendo esta saída.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0009-rag-langchain4j.html">← 9 · RAG no LangChain4j</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 10 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-09-saida-estruturada.md">curso/modulo-09</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

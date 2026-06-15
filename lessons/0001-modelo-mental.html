@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 1 — O modelo mental: por que um LLM puro não sabe seu saldo</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 0 · Fundamentos · Lição 1</p>
+  <h1>O modelo mental: por que um LLM puro não sabe o seu saldo</h1>
+  <p class="lede">Antes de uma linha de LangChain4j, a fundação: o que um LLM é, as três limitações que tudo o mais existe para superar, e por que o agente é a parte <em>não-confiável</em> do seu sistema.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> você está construindo um assistente bancário agêntico <em>em produção</em>. Este modelo mental é o que separa um sistema seguro por construção de um castelo de areia que responde valores inventados sobre o dinheiro do cliente.
+  </div>
+
+  <h2>1 · O que um LLM realmente é</h2>
+  <p>Um <strong>LLM</strong> (<em>Large Language Model</em> / Modelo de Linguagem de Grande Porte) é, no fundo, uma função que <strong>prevê o próximo <em>token</em></strong> de texto. Imagine o consultor mais erudito do mundo, trancado numa sala sem janelas, sem telefone e sem computador: sabe a <em>teoria</em> de Pix, CDB e financiamento, mas não sabe nada sobre <em>você</em> nem pode <em>executar</em> nada.</p>
+  <p>Dessa natureza nascem três propriedades que governam tudo:</p>
+  <table>
+    <thead><tr><th>Propriedade</th><th>O que significa no banco</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Estático</strong> (congelado no treino)</td><td>Nunca viu seu saldo nem a fatura de ontem; e nunca verá, sozinho.</td></tr>
+      <tr><td><strong>Sem estado</strong> (<em>stateless</em>)</td><td>Não "lembra" da conversa — a memória é uma ilusão que <em>nós</em> criamos reenviando o histórico.</td></tr>
+      <tr><td><strong>Só produz texto</strong></td><td>Não acessa banco de dados, não chama API, não move dinheiro. Só fala.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2 · As três limitações que criam todo o resto</h2>
+  <p>Pergunte a um LLM puro: <em>"Qual o saldo da minha conta global?"</em> Ele não pode responder — e entender <em>por quê</em> é a fundação inteira da engenharia agêntica:</p>
+  <ol>
+    <li><strong>Sem dados em tempo real e privados</strong> — o saldo vive no <em>core</em> bancário, não no treino.</li>
+    <li><strong>Sem capacidade de agir</strong> — mesmo sabendo <em>onde</em> o dado está, não consegue chamar o sistema.</li>
+    <li><strong>Sem memória entre turnos</strong> — "transfere R$100 pra ela" e ele já esqueceu quem é "ela".</li>
+  </ol>
+  <p>Todo o resto da trilha resolve isto: limitações 1 e 2 → <strong>tools</strong> e <strong>RAG</strong> (<em>Retrieval-Augmented Generation</em> / Geração Aumentada por Recuperação); limitação 3 → <strong>gestão de contexto e memória</strong>.</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> A <strong>tool</strong> (ferramenta) é uma função do <em>seu</em> código que você descreve ao modelo e que ele pode <strong>pedir</strong> para executar. Repare: o modelo <strong>não executa nada</strong> — ele apenas <em>sugere</em> a ação; quem executa, valida e autoriza é o seu código. Tratar a sugestão do modelo como autorização é a raiz de uma classe inteira de vulnerabilidades.</p>
+  </blockquote>
+
+  <h2>3 · O que torna o sistema "agêntico"</h2>
+  <p>Um <strong>agente</strong> não é um modelo diferente — é um modelo dentro de um <strong>loop</strong> que usa tools para cumprir um objetivo (padrão <strong>ReAct</strong>, de <em>Reasoning + Acting</em> / Raciocinar + Agir: Pensar → Agir → Observar → repetir). A diferença entre um chatbot e um agente é que o agente <em>decide chamar ferramentas, observa os resultados e encadeia várias chamadas</em> antes de responder.</p>
+
+  <div class="warn">
+    <strong>A verdade desconfortável que ancora a segurança:</strong> para o modelo, <em>tudo que está na janela de contexto é "texto"</em> — a <strong>janela de contexto</strong> (<em>context window</em>) é o espaço finito de texto que o modelo enxerga numa chamada (system prompt + histórico + pergunta + documentos), a "mesa" sobre a qual ele raciocina. E ele não distingue com segurança o que é <strong>dado</strong> do que é <strong>ordem</strong>. O <em>system prompt</em> é uma instrução, não um cofre. Você projeta assumindo que o modelo <em>pode</em> ser persuadido (prompt injection) e coloca as travas reais — autorização, validação, confirmação — na camada determinística, fora do alcance do texto.
+  </div>
+
+  <h2>4 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por que um LLM puro não consegue informar o saldo da conta global?</p>
+      <button class="opt" data-k="a">Porque o modelo é pequeno demais para tantos dados</button>
+      <button class="opt" data-k="b">Porque o dado é privado, vivo, e ele não pode agir</button>
+      <button class="opt" data-k="c">Porque o idioma português confunde o modelo treinado</button>
+      <p class="explain">As três limitações: sem dado privado/vivo, sem capacidade de agir, sem memória.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Quem realmente executa uma tool quando o modelo a "chama"?</p>
+      <button class="opt" data-k="a">O próprio modelo, com acesso direto ao backend</button>
+      <button class="opt" data-k="b">O provedor do LLM, num ambiente isolado seguro</button>
+      <button class="opt" data-k="c">O seu código, que valida e autoriza antes de agir</button>
+      <p class="explain">O modelo só propõe; a execução, validação e autorização são determinísticas e suas.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Por que o system prompt "não é um cofre"?</p>
+      <button class="opt" data-k="a">Porque o modelo lê dado e ordem como o mesmo texto</button>
+      <button class="opt" data-k="b">Porque o system prompt é criptografado pelo provedor</button>
+      <button class="opt" data-k="c">Porque o usuário nunca consegue ver o system prompt</button>
+      <p class="explain">Tudo na janela é texto para o modelo; a segurança real vive fora dela.</p>
+    </div>
+  </div>
+
+  <h2>5 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>. Leitura curta e canônica sobre o que é (e o que não é) um agente, e quando o loop agêntico se justifica. Termos canônicos deste workspace: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (por que <em>stateless</em> vira custo? como a identidade fica fora do modelo?), me pergunte e eu aprofundo ou crio um exercício sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0001-modelo-mental.html">1 · Modelo mental</a>
+      <a href="0002-anatomia-da-chamada.html">2 · Anatomia da chamada →</a>
+    </nav>
+    <p class="fine">Lição 1 de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-01-fundamentos-modelo-mental.md">curso/modulo-01</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

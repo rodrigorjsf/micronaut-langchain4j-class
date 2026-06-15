@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossário — Sistemas Agênticos com LangChain4j</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Referência · Cartão de consulta · pt-BR</p>
+  <h1>Glossário — Sistemas Agênticos com LangChain4j</h1>
+  <p class="lede">A linguagem canônica deste workspace: termos que toda lição e registro de aprendizado deve adotar. Cartão denso e imprimível — cresce e é revisado conforme o entendimento se aprofunda.</p>
+
+  <h2>Fundamentos (agnósticos de framework)</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Definição</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>LLM</strong> (<em>Large Language Model</em> / Modelo de Linguagem de Grande Porte)</td>
+        <td>Função que prevê o próximo <em>token</em> de texto; estática (conhecimento congelado no treino), sem estado e que só produz texto.<br><span class="fine"><em>Avoid</em>: "a IA", "o modelo que pensa"</span></td>
+      </tr>
+      <tr>
+        <td><strong>Token</strong></td>
+        <td>Menor unidade de texto que o modelo processa (uma <em>subpalavra</em>); é também a unidade de cobrança e de medição da janela de contexto.</td>
+      </tr>
+      <tr>
+        <td><strong>Tool (Ferramenta)</strong></td>
+        <td>Função do seu código que você descreve ao modelo e que ele pode <strong>pedir</strong> para executar; o modelo nunca a executa, só a solicita.<br><span class="fine"><em>Avoid</em>: "função do modelo", "plugin"</span></td>
+      </tr>
+      <tr>
+        <td><strong>Agente (Agent)</strong></td>
+        <td>Um LLM operando dentro de um <strong>loop</strong> que usa <em>tools</em> para cumprir um objetivo (Pensar → Agir → Observar → repetir).</td>
+      </tr>
+      <tr>
+        <td><strong>Janela de contexto (Context window)</strong></td>
+        <td>A "mesa de trabalho" finita, medida em <em>tokens</em>, onde tudo que o modelo enxerga (instruções, histórico, descrições de tools, resultados) precisa caber de uma vez. Entrada e saída disputam o mesmo orçamento.</td>
+      </tr>
+      <tr>
+        <td><strong>System prompt</strong></td>
+        <td>A "constituição" do agente: papel, regras e limites. É uma <strong>instrução, não um cofre</strong> — não é barreira de segurança.</td>
+      </tr>
+      <tr>
+        <td><strong>RAG</strong> (<em>Retrieval-Augmented Generation</em> / Geração Aumentada por Recuperação)</td>
+        <td>Recuperar trechos de conhecimento relevantes e injetá-los na janela de contexto para fundamentar a resposta. Para conhecimento; <em>tools</em> para dados vivos/ação.</td>
+      </tr>
+      <tr>
+        <td><strong>Embedding</strong></td>
+        <td>Vetor numérico que representa o <strong>significado</strong> de um texto; textos de sentido parecido ficam próximos no espaço vetorial.</td>
+      </tr>
+      <tr>
+        <td><strong>Prompt injection (Injeção de instruções)</strong></td>
+        <td>Texto malicioso na janela de contexto que finge ser instrução. <strong>Direto</strong> (na mensagem do usuário) ou <strong>indireto</strong> (escondido em documento de RAG ou resultado de tool).</td>
+      </tr>
+      <tr>
+        <td><strong>Tool de leitura vs. de ação</strong></td>
+        <td>Leitura consulta e é idempotente (pode executar quando o modelo pede); ação muda estado/dinheiro (exige confirmação, idempotência e autorização reforçada).</td>
+      </tr>
+      <tr>
+        <td><strong>Identidade-pelo-servidor</strong></td>
+        <td>Princípio de que parâmetros de identidade/autorização (ex.: <code>clienteId</code>) vêm da sessão autenticada, <strong>nunca</strong> dos argumentos fornecidos pelo modelo.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>LangChain4j</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Definição</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>LangChain4j</strong></td>
+        <td>Biblioteca Java idiomática (não um <em>port</em> do LangChain Python) com API unificada sobre provedores de LLM e <em>vector stores</em>, <em>tool calling</em> (incl. MCP), RAG e agentes.</td>
+      </tr>
+      <tr>
+        <td><strong>AiServices</strong></td>
+        <td>API de <strong>alto nível</strong>: você declara uma interface Java anotada e o framework gera a implementação, rodando o loop agêntico por você.</td>
+      </tr>
+      <tr>
+        <td><strong>ChatModel / StreamingChatModel</strong></td>
+        <td>API de <strong>baixo nível</strong>: você monta as mensagens e controla o loop manualmente.</td>
+      </tr>
+      <tr>
+        <td><strong><code>@Tool</code></strong></td>
+        <td>Anotação de método que o expõe como ferramenta. <code>name()</code> = nome (padrão: nome do método); <code>value()</code> = <strong>descrição</strong> (um <code>String[]</code>).</td>
+      </tr>
+      <tr>
+        <td><strong><code>@P</code></strong></td>
+        <td>Anotação de parâmetro de tool (descrição/nome); todo parâmetro é <strong>obrigatório por padrão</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong><code>@ToolMemoryId</code> / <code>@MemoryId</code></strong></td>
+        <td>Par que injeta o <em>memory id</em> (identidade da sessão) num parâmetro de tool — a materialização da identidade-pelo-servidor.</td>
+      </tr>
+      <tr>
+        <td><strong>ChatMemory</strong></td>
+        <td>Mecanismo que reenvia o histórico (o modelo é sem estado); ex.: <code>MessageWindowChatMemory</code> (janela de N mensagens).</td>
+      </tr>
+      <tr>
+        <td><strong><code>langchain4j-bom</code></strong></td>
+        <td><em>Bill of Materials</em> que alinha as versões dos módulos; deve ser sempre importado (versionamento duplo: estável + beta).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Micronaut / Java</h2>
+  <table>
+    <thead><tr><th>Termo</th><th>Definição</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>DI de compilação (Micronaut)</strong></td>
+        <td>Injeção de dependências resolvida em <strong>tempo de compilação</strong> (via <em>annotation processor</em>), sem reflexão em <em>runtime</em> — <em>startup</em> rápido, baixa memória, compatível com GraalVM nativo.</td>
+      </tr>
+      <tr>
+        <td><strong>Virtual Threads / Scoped Values / Structured Concurrency</strong></td>
+        <td>Recursos de concorrência do Project Loom. No Java 25: Virtual Threads e Scoped Values são <strong>finais</strong>; Structured Concurrency ainda é <strong><em>preview</em></strong> (JEP 505).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer>
+    <p class="fine">Cartão de referência · workspace <code>/teach</code> · pt-BR · Foundation First. Fonte canônica: <a href="../GLOSSARY.md">GLOSSARY.md</a> — toda lição e registro de aprendizado deve aderir a estes termos.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

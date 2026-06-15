@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 19 — O ecossistema honesto: Java (LangChain4j) vs. Python</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 4 · Produção, Segurança e Escala · Lição 19</p>
+  <h1>O ecossistema honesto: Java (LangChain4j) vs. Python</h1>
+  <p class="lede">A lição de fechamento: separar <strong>o que existe de verdade em Java</strong> do que é <strong>só Python</strong> — sem hype. Num banco, escolha dependência por <strong>maturidade + bus-factor</strong>, não por moda. (Contagens de stars são ordem de grandeza; variam diariamente.)</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> metade dos tutoriais "LangChain" que você acha são Python e não têm par Java. Escolher uma dependência imatura ou de mantenedor único para um sistema que move dinheiro é dívida técnica perigosa. Esta lição te dá o mapa honesto para decidir.
+  </div>
+
+  <h2>1 · O mapa honesto</h2>
+  <table>
+    <thead><tr><th>Peça</th><th>Realidade em Java</th><th>Recomendação p/ o banco</th></tr></thead>
+    <tbody>
+      <tr><td><strong>LangChain4j</strong></td><td><strong>GA</strong> (1.16.x)</td><td>base do curso</td></tr>
+      <tr><td><strong>langchain4j-agentic</strong></td><td><strong>oficial, mas só BETA</strong> (1.16.2-beta26)</td><td>use, com pin de versão; espere quebras</td></tr>
+      <tr><td><strong>LangGraph</strong></td><td><strong>só Python</strong> (~34,7k★); Java = <code>langgraph4j</code> comunitário</td><td>prefira o agentic oficial</td></tr>
+      <tr><td><strong>langgraph4j</strong></td><td>comunitário, ~1,7k★, <strong>single-maintainer</strong></td><td>vendor/fork se adotar</td></tr>
+      <tr><td><strong>Deep Agents</strong></td><td><strong>só Python</strong> (~24,6k★); <code>langgraph4j-deepagents</code> embrionário (31★)</td><td>não dependa em produção</td></tr>
+      <tr><td><strong>LangServe</strong></td><td><strong>ARQUIVADO</strong> (até em Python); sem Java</td><td>sirva via Micronaut/Spring</td></tr>
+      <tr><td><strong>LangSmith</strong></td><td><code>langsmith-java</code> <strong>beta</strong> (0.1.0-beta.7)</td><td>use <strong>OTel</strong></td></tr>
+      <tr><td><strong>LangFuse</strong></td><td><strong>sem SDK Java</strong> (só Python/JS)</td><td>use <strong>OTel</strong></td></tr>
+      <tr><td><strong>Spring AI</strong></td><td><strong>GA</strong> (v2.0.0)</td><td>par Java alternativo</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2 · Orquestração: oficial-beta vs. comunitário</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>"Oficial" ≠ "GA"; "popular em Python" ≠ "disponível em Java".</strong> O <code>langchain4j-agentic</code> é <strong>oficial</strong> (mantido pelo time) mas <strong>só existe em beta</strong> — pin a versão, espere quebras. O <code>langgraph4j</code> é <strong>comunitário</strong> (org <code>langgraph4j</code>, não <code>langchain-ai</code>) e <strong>efetivamente de um mantenedor</strong> (top contribuidor 3431 commits vs. 13 do segundo) — <strong>risco de bus-factor</strong> para um banco. Prefira o agentic oficial; se adotar o langgraph4j, <strong>vendor/fork-mirror</strong>. Ambos são <strong>model-agnostic</strong> → o <code>BedrockChatModel</code> pluga direto.</p>
+  </blockquote>
+
+  <h2>3 · Serving: o "LangServe do Java" não existe</h2>
+  <p>O <code>LangServe</code> está <strong>arquivado</strong> (até em Python) e <strong>não tem equivalente Java</strong>. Sirva o app LangChain4j com <strong>controllers do Micronaut</strong> (ou Spring) — você já tem um framework HTTP de primeira classe; não precisa de uma camada estilo LangServe.</p>
+
+  <h2>4 · Observabilidade: OTel é o caminho (recap da Lição 17)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Nem LangFuse nem LangSmith têm SDK Java de produção.</strong> LangFuse <strong>não tem SDK Java</strong> algum (o <code>langfuse-java</code> é um <em>client de API auto-gerado</em>, não instrumenta a app); o <code>langsmith-java</code> está <strong>só em beta</strong>. O caminho de produção, vendor-neutral e <strong>auditável</strong>, é o <strong>OpenTelemetry/OTLP</strong> — ambos ingerem OTLP (LangFuse em <code>/api/public/otel</code>; LangSmith em <code>api.smith.langchain.com/otel</code>), e o Micronaut tem OTel nativo. Para rastrear operações que movem dinheiro, OTel &gt; SDK beta de vendor.</p>
+  </blockquote>
+
+  <h2>5 · O outro framework Java: Spring AI (GA)</h2>
+  <p><code>spring-projects/spring-ai</code> é <strong>GA</strong> (v2.0.0, Apache-2.0) — um <strong>par/alternativa</strong> ao LangChain4j no espaço de AI-engineering em Java. Saber que existe (e que é GA) é honestidade de ecossistema; a escolha entre os dois é de stack/time, não de capacidade.</p>
+
+  <h2>6 · O esboço (orquestração oficial + Bedrock + OTel)</h2>
+  <pre><code>// dev.langchain4j:langchain4j-agentic:1.16.2-beta26 (BETA → pin)  + langchain4j-bedrock
+ChatModel bedrock = BedrockChatModel.builder()
+        .modelId("us.anthropic.claude-sonnet-4-5-20250929-v1:0").region(Region.US_EAST_1).build();
+
+interface AccountAssistant {
+    @UserMessage("Resolva: {{request}}")
+    String handle(@V("request") String request);
+}
+AccountAssistant a = AgenticServices.agentBuilder(AccountAssistant.class)
+        .chatModel(bedrock)          // model-agnostic → Bedrock pluga aqui
+        .build();
+// Observabilidade: exporte via OTel/OTLP para LangFuse/LangSmith (sem SDK Java de produção).</code></pre>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. O langgraph4j é o LangGraph oficial para Java?</p>
+      <button class="opt" data-k="a">Sim, mantido pelo time langchain-ai como porta oficial</button>
+      <button class="opt" data-k="b">Não: é porta comunitária, efetivamente de um mantenedor só</button>
+      <button class="opt" data-k="c">Sim, é o módulo agêntico oficial embutido no LangChain4j</button>
+      <p class="explain">langgraph4j vive na org comunitária langgraph4j (não langchain-ai) e é efetivamente single-maintainer (3431 vs 13 commits) — bus-factor. O agêntico oficial é o langchain4j-agentic.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. Como servir um app LangChain4j em HTTP (o "LangServe do Java")?</p>
+      <button class="opt" data-k="a">Pelo LangServe, a camada de serving oficial portada</button>
+      <button class="opt" data-k="b">Por controllers do Micronaut (ou Spring): LangServe está arquivado</button>
+      <button class="opt" data-k="c">Por um sidecar Python LangServe rodando ao lado da JVM</button>
+      <p class="explain">LangServe está arquivado até em Python e não tem equivalente Java. Use o framework HTTP que você já tem — controllers do Micronaut (ou Spring).</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Caminho de produção para traços em LangFuse/LangSmith em Java?</p>
+      <button class="opt" data-k="a">Os SDKs Java GA oficiais publicados por cada plataforma</button>
+      <button class="opt" data-k="b">OpenTelemetry/OTLP — não há SDK Java de produção para eles</button>
+      <button class="opt" data-k="c">O cliente langfuse-java, que instrumenta toda a aplicação</button>
+      <p class="explain">LangFuse não tem SDK Java; langsmith-java é beta. Ambos ingerem OTLP. O langfuse-java é só um client de API auto-gerado, não instrumenta a app.</p>
+    </div>
+  </div>
+
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> Maven Central (<code>langchain4j-agentic</code>, <code>langsmith-java</code>) e GitHub (<a href="https://github.com/langgraph4j/langgraph4j">langgraph4j</a>, <a href="https://github.com/langchain-ai/langserve">langserve</a> arquivado, <a href="https://github.com/spring-projects/spring-ai">spring-ai</a>), além das docs OTel de LangFuse/LangSmith. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> 🎉 <strong>Esta fecha a trilha base (19 lições).</strong> Quer que eu monte o esqueleto do projeto Micronaut do banco unindo tudo — Bedrock + tools + RAG + memória + guardrails + segurança + observabilidade + resiliência — ou que aprofunde qualquer lição? É só pedir.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0018-escala-resiliencia.html">← 18 · Escala e resiliência</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 19 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-17-ecossistema-honesto.md">curso/modulo-17</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

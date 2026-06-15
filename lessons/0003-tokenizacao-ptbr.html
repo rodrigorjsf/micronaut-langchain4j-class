@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 3 — Tokenização pt-BR vs. inglês e o custo</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 0 · Fundamentos · Lição 3</p>
+  <h1>Tokenização pt-BR vs. inglês e o custo</h1>
+  <p class="lede">O mesmo conteúdo bancário em português gasta mais <em>tokens</em> que em inglês. Aqui os números não são chutados — foram <strong>medidos</strong> — e você verá por que essa "inflação" vira <strong>arquitetura de custo</strong>, não detalhe.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> seu assistente bancário agêntico roda em <strong>LangChain4j + Micronaut 5 + Java 25</strong> e responde ao cliente <em>obrigatoriamente em pt-BR</em>. O português infla justamente o lado mais caro (a saída) e o histórico que cresce N² a cada turno. Medir o custo do token é, portanto, parte do <em>design</em> do produto — não algo para descobrir no pós-incidente.
+  </div>
+
+  <h2>1 · O que foi medido (metodologia)</h2>
+  <p>Estes números não são estimados — foram <strong>medidos</strong> com o <code>tiktoken</code> (biblioteca real de tokenização da OpenAI), comparando dois <em>tokenizers</em> (tokenizadores):</p>
+  <ul>
+    <li><code>cl100k_base</code> — usado por GPT-4 / GPT-3.5.</li>
+    <li><code>o200k_base</code> — usado por GPT-4o e posteriores; vocabulário maior e mais multilíngue.</li>
+  </ul>
+  <p>Foram tokenizadas 5 frases bancárias <strong>equivalentes</strong> em inglês e português, mais um trecho de <em>system prompt</em> (instrução fixa de sistema), com os dois tokenizadores. Para isolar variáveis, as frases pt-BR foram escritas <strong>sem acentos</strong> (o efeito dos acentos é medido à parte, na Seção 4) — ou seja, os números de inflação abaixo são um <strong>piso</strong>: com acentuação real, a inflação é um pouco maior.</p>
+
+  <div class="warn">
+    São tokenizadores da OpenAI. Modelos da Anthropic (Claude) e outros usam tokenizadores próprios, com contagens diferentes. Mas o <strong>padrão</strong> (português gasta mais tokens que inglês, e tokenizadores mais novos reduzem a diferença) <strong>se mantém</strong> em todos os tokenizadores <strong>BPE</strong> (<em>Byte Pair Encoding</em> / Codificação por Pares de Bytes) modernos. Use estes números como <em>ilustração da mecânica</em>, não como verdade exata para o seu modelo. <strong>Importante para este curso:</strong> o modelo-alvo é o <strong>Claude Sonnet (200K)</strong>, que usa <strong>tokenizador próprio</strong> (diferente do <code>tiktoken</code> da OpenAI) — então trate estes números como <em>ilustração da mecânica</em>, não como contagem exata para o Claude. O Claude <strong>não tem tokenizador offline oficial</strong>: para números exatos no caminho do banco, use a API <strong>CountTokens da Bedrock</strong> (<code>POST /model/{modelId}/count-tokens</code>).
+  </div>
+
+  <h2>2 · Resultado medido: a inflação do português</h2>
+  <table>
+    <thead><tr><th>Tokenizador</th><th>Tokens EN (5 frases)</th><th>Tokens PT</th><th>Inflação</th><th>System prompt (EN→PT)</th></tr></thead>
+    <tbody>
+      <tr><td><code>cl100k_base</code> (GPT-4/3.5)</td><td>60</td><td>88</td><td><strong>1,467×</strong></td><td>26 → 32 (1,231×)</td></tr>
+      <tr><td><code>o200k_base</code> (GPT-4o+)</td><td>59</td><td>75</td><td><strong>1,271×</strong></td><td>26 → 31 (1,192×)</td></tr>
+    </tbody>
+  </table>
+  <p>Leitura: o mesmo conteúdo em português custa de <strong>~27% a ~47% mais tokens</strong> que em inglês, <strong>dependendo do tokenizador</strong>.</p>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Lição medida —</span> <strong>Trocar de tokenizador cortou ~15% dos tokens do português</strong> (88 → 75), enquanto o inglês quase não mudou (60 → 59). Ou seja: escolher um modelo com tokenizador moderno (vocabulário ~200k, mais multilíngue) é uma <strong>alavanca de custo concreta e gratuita</strong> para um produto em pt-BR — sem mudar uma linha do seu texto. O português é "penalizado" justamente por ser sub-representado no vocabulário; vocabulários maiores e mais multilíngues reduzem essa penalidade.</p>
+  </blockquote>
+
+  <h2>3 · Por que isso acontece (a mecânica)</h2>
+  <p>A tokenização <strong>BPE</strong> (<em>Byte Pair Encoding</em>) <strong>aprende</strong> seus "pedaços" a partir de um corpus de treino majoritariamente em inglês. Consequência:</p>
+  <ul>
+    <li>Palavras e subpalavras <strong>inglesas frequentes</strong> ganham um token próprio (ex.: <code>invoice</code>, <code>statement</code>, <code>account</code>).</li>
+    <li>A <strong>morfologia rica do português</strong> — sufixos como <code>-ção</code>, <code>-mento</code>, <code>-ância</code>, e a infinidade de conjugações verbais — é sub-representada, então fragmenta em pedaços menores.</li>
+  </ul>
+  <p>Veja como termos bancários em pt-BR se quebram (<code>o200k_base</code>, pedaços separados por <code>·</code>):</p>
+  <pre><code>  Pix            1 tok  -&gt;  Pix
+  saldo          1 tok  -&gt;  saldo
+  boleto         2 tok  -&gt;  bole·to
+  fatura         2 tok  -&gt;  f·atura
+  cartão         2 tok  -&gt;  cart·ão
+  extrato        2 tok  -&gt;  extr·ato
+  investimento   2 tok  -&gt;  invest·imento
+  agendamento    2 tok  -&gt;  ag·endamento
+  comprovante    3 tok  -&gt;  com·prov·ante
+  financiamento  3 tok  -&gt;  fin·anci·amento
+  vencimento     3 tok  -&gt;  v·enc·imento</code></pre>
+  <p><code>Pix</code> e <code>saldo</code> têm sorte (1 token). Já <code>comprovante</code>, <code>financiamento</code> e <code>vencimento</code> — termos que aparecem o tempo todo num assistente bancário — custam <strong>3 tokens cada</strong>.</p>
+
+  <h2>4 · O efeito dos acentos (diacríticos)</h2>
+  <p>Em UTF-8, uma letra acentuada ocupa <strong>mais de um byte</strong>, e o BPE pode ou não ter aprendido a forma acentuada como token limpo. Medido (<code>o200k_base</code>):</p>
+  <table>
+    <thead><tr><th>Sem acento</th><th>Tokens</th><th>Com acento</th><th>Tokens</th><th>Δ</th></tr></thead>
+    <tbody>
+      <tr><td><code>credito</code></td><td>1</td><td><code>crédito</code></td><td>2</td><td><strong>+1</strong></td></tr>
+      <tr><td><code>confirmacao</code></td><td>2</td><td><code>confirmação</code></td><td>3</td><td><strong>+1</strong></td></tr>
+      <tr><td><code>cartao</code></td><td>2</td><td><code>cartão</code></td><td>2</td><td>0</td></tr>
+      <tr><td><code>vencimento</code></td><td>3</td><td><code>vencimento</code></td><td>3</td><td>0</td></tr>
+      <tr><td><code>transferencia</code></td><td>2</td><td><code>transferência</code></td><td>2</td><td>0</td></tr>
+    </tbody>
+  </table>
+  <p>O acento <strong>às vezes</strong> adiciona um token (<code>crédito</code>, <code>confirmação</code>), às vezes não. Como o português real é acentuado, a inflação de produção fica <strong>acima</strong> do piso medido na Seção 2.</p>
+
+  <h2>5 · O impacto no custo: três multiplicadores que se empilham</h2>
+  <p>A inflação do português não age sozinha. Ela <strong>multiplica</strong> com outros dois fatores já vistos na Lição 2:</p>
+  <ol>
+    <li><strong>Inflação de idioma</strong> (×1,27 a ×1,47): português gasta mais tokens.</li>
+    <li><strong>Prêmio da saída</strong>: tokens de <strong>saída custam mais</strong> que os de entrada (ex.: 5×). E a resposta ao cliente é <strong>obrigatoriamente</strong> em pt-BR — você não consegue fugir da inflação no lado mais caro.</li>
+    <li><strong>Crescimento N²</strong> (Seção 2.4): o histórico reenviado a cada turno faz o custo da conversa crescer quadraticamente — e cada token desse histórico já vem inflado pelo idioma.</li>
+  </ol>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> O resultado é que o "imposto do português" incide com mais força exatamente onde dói: na saída (mais cara) e no histórico que se acumula (N²).</p>
+  </blockquote>
+
+  <h2>6 · Estratégias de mitigação (acionáveis)</h2>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Por que funciona</th><th>Quanto economiza</th><th>Ressalva</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Escolher modelo com tokenizador moderno</strong></td>
+        <td>Vocabulário maior e mais multilíngue fragmenta menos o português.</td>
+        <td><strong>~15% medido</strong> (cl100k→o200k) no mesmo texto pt-BR.</td>
+        <td>Depende do provedor; meça com o tokenizador real do seu modelo.</td>
+      </tr>
+      <tr>
+        <td><strong>Escrever o <em>overhead</em> fixo em inglês</strong> (system prompt, descrições de tools, nomes de campos) e instruir o modelo a <strong>responder em pt-BR</strong></td>
+        <td>Esse bloco é enviado em <strong>toda</strong> chamada; em inglês ele encolhe ~20%.</td>
+        <td>~19–23% medido no system prompt.</td>
+        <td>Modelos capazes seguem bem "instruções em inglês, resposta em pt-BR" — mas <strong>teste</strong>. Exemplos <em>few-shot</em> que precisam ser em pt-BR continuam em pt-BR.</td>
+      </tr>
+      <tr>
+        <td><strong>Conter a verbosidade da saída</strong> (<code>max_tokens</code>, estilo conciso)</td>
+        <td>Saída é inflada <strong>e</strong> mais cara por token.</td>
+        <td>Proporcional ao corte.</td>
+        <td>Não sacrifique clareza com o cliente.</td>
+      </tr>
+      <tr>
+        <td><strong>Gestão agressiva de contexto</strong> (Lição 16)</td>
+        <td>Corta o N² antes que ele multiplique a inflação.</td>
+        <td>Pode ser a maior economia de todas.</td>
+        <td>É um módulo inteiro; vem depois.</td>
+      </tr>
+      <tr>
+        <td><strong>Medir, não chutar</strong></td>
+        <td>Orçamento de tokens baseado em medição real (como esta).</td>
+        <td>Evita surpresas de custo em produção.</td>
+        <td>Embuta a contagem no <em>design</em>, não no pós-incidente.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>7 · Resumo de uma frase</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> Em pt-BR, <strong>todo token conta mais</strong> — e como o português infla justamente a saída (mais cara) e o histórico (N²), as decisões de tokenizador, idioma do <em>prompt</em> fixo e gestão de contexto deixam de ser detalhe e viram <strong>arquitetura de custo</strong>.</p>
+  </blockquote>
+
+  <h2>Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. Por que o português gasta mais tokens que o inglês na mesma frase?</p>
+      <button class="opt" data-k="a">Porque o português usa frases mais longas que o inglês</button>
+      <button class="opt" data-k="b">Porque o vocabulário BPE foi treinado mais em inglês</button>
+      <button class="opt" data-k="c">Porque o português ainda não tem suporte oficial nos modelos</button>
+      <p class="explain">O BPE aprende seus "pedaços" de um corpus majoritariamente inglês, então a morfologia rica do português fragmenta mais.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Trocar de <code>cl100k_base</code> para <code>o200k_base</code> economiza no pt-BR porque o tokenizador novo…</p>
+      <button class="opt" data-k="a">comprime o texto antes de enviá-lo ao modelo remoto</button>
+      <button class="opt" data-k="b">remove os acentos das palavras para poupar bytes UTF-8</button>
+      <button class="opt" data-k="c">tem vocabulário maior e mais multilíngue, fragmentando menos</button>
+      <p class="explain">~200k de vocabulário, mais multilíngue, reduz a penalidade do português — ~15% medido, sem mudar o texto.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>3. Por que o "imposto do português" dói tanto num assistente bancário?</p>
+      <button class="opt" data-k="a">Incide na saída (mais cara) e no histórico que cresce N²</button>
+      <button class="opt" data-k="b">Obriga a reescrever todo o system prompt em pt-BR sempre</button>
+      <button class="opt" data-k="c">Impede o uso de tools porque os nomes ficam muito longos</button>
+      <p class="explain">A resposta ao cliente é obrigatoriamente em pt-BR (lado caro) e cada token do histórico reenviado já vem inflado.</p>
+    </div>
+  </div>
+
+  <h2>Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://github.com/openai/tiktoken">openai/tiktoken — o tokenizador BPE oficial da OpenAI</a>. É a própria biblioteca usada para <em>medir</em> todos os números desta lição; o repositório traz os <em>encodings</em> <code>cl100k_base</code> e <code>o200k_base</code> e exemplos para você reproduzir a contagem no seu próprio texto pt-BR. Termos canônicos deste workspace: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (por que o BPE fragmenta o português? como o N² multiplica a inflação? quando vale escrever o prompt fixo em inglês?), me pergunte e eu aprofundo ou crio um exercício sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0002-anatomia-da-chamada.html">← 2 · Anatomia da chamada</a>
+      <a href="0004-loop-agentico-tool-calling.html">4 · Loop agêntico e tool calling →</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 3 de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-02-aprofundamento-tokenizacao-ptbr.md">curso/modulo-02-aprofundamento-tokenizacao-ptbr</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

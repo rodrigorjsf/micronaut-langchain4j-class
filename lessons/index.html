@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trilha — Sistemas Agênticos com LangChain4j + Micronaut 5 + Java 25</title>
+<style>
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  ol.toc{list-style:none; padding:0; margin:.6rem 0}
+  ol.toc li{margin:.5rem 0; padding:.6rem .8rem; border:1px solid var(--rule); border-radius:8px; background:#fff}
+  ol.toc li.future{background:#faf8f3; opacity:.7}
+  ol.toc .n{font-variant:small-caps; color:var(--accent); font-weight:700; font-size:.8rem; letter-spacing:.04em}
+  ol.toc a{font-weight:600; text-decoration:none}
+  ol.toc .d{display:block; color:var(--muted); font-size:.85rem; margin-top:.15rem}
+  .partlabel{font-variant:small-caps; letter-spacing:.05em; color:var(--gold); font-weight:700; font-size:.82rem; margin:1.4rem 0 .2rem}
+  .refs{display:flex; flex-wrap:wrap; gap:.5rem .9rem; margin:.6rem 0}
+  .refs a{text-decoration:none; border:1px solid var(--rule); border-radius:20px; padding:.3rem .8rem; font-size:.86rem; background:#fff}
+  .docs{font-size:.9rem}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem; color:var(--muted)}
+  @media print{ :root{--paper:#fff} a{color:var(--ink)} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Workspace /teach · pt-BR · Foundation First</p>
+  <h1>🏦 Trilha — Sistemas Agênticos com LangChain4j + Micronaut 5 + Java 25</h1>
+  <p class="lede">Do modelo mental ao agente em produção, sempre ancorado no assistente de chat de um banco que consulta produtos via ferramentas.</p>
+
+  <div class="mission">
+    <b>Missão —</b> construir, <em>em produção</em>, o backend agêntico de um assistente bancário (boleto, DDA, Pix, Super Extrato, cartão/fatura, investimentos, financiamento, conta nacional e global) em <strong>Claude Sonnet (200K) via AWS Bedrock</strong>, acertando arquitetura, segurança e escala. Ver <a href="../MISSION.md">MISSION.md</a>.
+  </div>
+
+  <h2>Lições</h2>
+
+  <p class="partlabel">Parte 0 — Modelo mental (sem framework)</p>
+  <ol class="toc">
+    <li><span class="n">Lição 1</span> · <a href="0001-modelo-mental.html">O modelo mental: por que um LLM puro não sabe seu saldo</a>
+      <span class="d">LLM, tools, agente, janela de contexto, system prompt, RAG, prompt injection — o vocabulário.</span></li>
+  </ol>
+
+  <p class="partlabel">Parte 1 — Fundamentos técnicos (sem framework)</p>
+  <ol class="toc">
+    <li><span class="n">Lição 2</span> · <a href="0002-anatomia-da-chamada.html">Anatomia de uma chamada a um LLM</a>
+      <span class="d">Tokens, janela de contexto, temperatura, custo (N²), latência, streaming.</span></li>
+    <li><span class="n">Lição 3</span> · <a href="0003-tokenizacao-ptbr.html">Tokenização pt-BR vs. inglês e o custo</a>
+      <span class="d">Medição real do "imposto do português" — com a ressalva do tokenizador do Claude.</span></li>
+    <li><span class="n">Lição 4</span> · <a href="0004-loop-agentico-tool-calling.html">O loop agêntico e o tool calling</a>
+      <span class="d">ReAct, function calling, modos de falha, identidade-pelo-servidor, leitura vs. ação.</span></li>
+    <li><span class="n">Lição 5</span> · <a href="0005-rag.html">RAG a fundo</a>
+      <span class="d">Embeddings, chunking, vector stores, busca híbrida; quando RAG e quando tool.</span></li>
+  </ol>
+
+  <p class="partlabel">Parte 2 — LangChain4j (versões verificadas)</p>
+  <ol class="toc">
+    <li><span class="n">Lição 6</span> · <a href="0006-arquitetura-langchain4j.html">Arquitetura: AiServices vs. ChatModel</a>
+      <span class="d">Os dois níveis de API; o AiServices é o loop da Lição 4 embrulhado.</span></li>
+    <li><span class="n">Lição 7</span> · <a href="0007-tools-langchain4j.html">Tools (@Tool): design e API verificada (1.16.2)</a>
+      <span class="d">@Tool/@P/@ToolMemoryId, tratamento de erros e armadilhas — conferido na fonte.</span></li>
+    <li><span class="n">Lição 8</span> · <a href="0008-chatmemory-contexto.html">ChatMemory e gestão da janela de contexto (200K + prompt caching)</a>
+      <span class="d">Janelas de memória, prompt caching como alavanca do N², persistência, vazamento de memória e LGPD.</span></li>
+    <li><span class="n">Lição 9</span> · <a href="0009-rag-langchain4j.html">RAG no LangChain4j (1.16.2) sobre AWS Bedrock</a>
+      <span class="d">EmbeddingStore, ContentRetriever, RetrievalAugmentor; embedding Cohere multilíngue via Bedrock; filtro de metadado forçado pelo servidor (nacional vs. global).</span></li>
+    <li><span class="n">Lição 10</span> · <a href="0010-saida-estruturada.html">Saída estruturada: do texto livre ao objeto tipado</a>
+      <span class="d">Tipo de retorno como contrato; JSON schema nativo vs. fallback por prompt; o opt-in de capability no Bedrock; tipado ≠ confiável.</span></li>
+    <li><span class="n">Lição 11</span> · <a href="0011-guardrails-moderacao.html">Guardrails e moderação: defendendo a saída</a>
+      <span class="d">Dois sistemas de guardrail (LangChain4j @Experimental vs. AWS Bedrock); InputGuardrail/OutputGuardrail + reprompt; moderação via Bedrock Guardrails; guardrail ≠ autorização.</span></li>
+  </ol>
+
+  <p class="partlabel">Parte 3 — Micronaut 5 + Java 25</p>
+  <ol class="toc">
+    <li><span class="n">Lição 12</span> · <a href="0012-micronaut-integracao.html">Integração micronaut-langchain4j: DI de compilação (e a versão real)</a>
+      <span class="d">@AiService, @Tool em @Singleton, beans Bedrock por config; a versão real (2.0.1 → LangChain4j 1.15.1); auth por AwsCredentialsProvider.</span></li>
+    <li><span class="n">Lição 13</span> · <a href="0013-java25-concorrencia.html">Java 25 para chamadas de tool em paralelo</a>
+      <span class="d">Virtual threads (final no 21), scoped values (final no 25), structured concurrency (preview); executeToolsConcurrently é opt-in.</span></li>
+    <li><span class="n">Lição 14</span> · <a href="0014-arquitetura-multibackend.html">Arquitetura multi-backend: agêntica, HITL e idempotência</a>
+      <span class="d">langchain4j-agentic (beta26), @Agent/@V vs. @P, human-in-the-loop; idempotência/confirmação são da app, não do framework.</span></li>
+  </ol>
+
+  <p class="partlabel">Parte 4 — Produção, Segurança e Escala</p>
+  <ol class="toc">
+    <li><span class="n">Lição 15</span> · <a href="0015-seguranca-owasp.html">Segurança: prompt injection e o OWASP LLM Top 10 (2025)</a>
+      <span class="d">Direta vs. indireta (RAG); o mapa OWASP 2025 → defesa do banco; o controle vive no código, nunca no prompt.</span></li>
+    <li><span class="n">Lição 16</span> · <a href="0016-contexto-a-fundo.html">Gestão da janela de contexto em profundidade</a>
+      <span class="d">Embutido vs. o que você constrói (sem sumarização/RAG-de-histórico prontos); eviction é lossy → estado durável fora da janela.</span></li>
+    <li><span class="n">Lição 17</span> · <a href="0017-observabilidade.html">Observabilidade: Listener, OpenTelemetry GenAI e LangFuse</a>
+      <span class="d">ChatModelListener (síncrono!), atributos gen_ai.* (provider "aws.bedrock"); LangFuse via OTLP (sem SDK Java).</span></li>
+    <li><span class="n">Lição 18</span> · <a href="0018-escala-resiliencia.html">Escala e resiliência: retries, throttling, quotas, fallback</a>
+      <span class="d">Duas camadas de retry empilhadas; on-demand vs. Provisioned Throughput; sem FallbackChatModel/rate limiter; idempotência sob retry.</span></li>
+    <li><span class="n">Lição 19</span> · <a href="0019-ecossistema-honesto.html">O ecossistema honesto: Java vs. Python</a>
+      <span class="d">Real em Java (LangChain4j/Spring AI GA; agentic beta) vs. só Python (LangGraph, Deep Agents); LangServe arquivado; OTel para LangFuse/LangSmith.</span></li>
+  </ol>
+
+  <h2>Referência rápida</h2>
+  <div class="refs">
+    <a href="../reference/glossary.html">📖 Glossário</a>
+    <a href="../reference/tool-api-cheatsheet.html">🛠️ @Tool API (1.16.2)</a>
+    <a href="../reference/versoes-2026-06.html">🔢 Versões (2026-06)</a>
+  </div>
+  <p class="docs">Documentos do workspace: <a href="../MISSION.md">MISSION.md</a> · <a href="../GLOSSARY.md">GLOSSARY.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../NOTES.md">NOTES.md</a> · rascunhos-fonte em <a href="../curso/README.md">curso/</a></p>
+
+  <footer>
+    Trilha base completa: <strong>19 lições</strong>, cada uma com quiz de recuperação e fonte primária verificada · pergunte ao seu professor (este agente) sobre qualquer ponto. Próximo passo prático: <strong>montar o projeto Micronaut do banco unindo as 19 lições</strong>.
+  </footer>
+
+</div>
+</body>
+</html>

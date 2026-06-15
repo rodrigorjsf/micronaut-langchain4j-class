@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 17 — Observabilidade: ChatModelListener, OpenTelemetry GenAI e LangFuse</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 4 · Produção, Segurança e Escala · Lição 17</p>
+  <h1>Observabilidade: Listener, OpenTelemetry GenAI e LangFuse</h1>
+  <p class="lede">"Você não opera o que não enxerga." Num banco, observar custo, latência e falhas do modelo é requisito de produção. O LangChain4j dá o <strong>hook</strong> (<code>ChatModelListener</code>); o padrão é o <strong>OpenTelemetry GenAI</strong>; o destino pode ser o <strong>LangFuse</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> sem traços e métricas, você não sabe o custo de token por cliente, a latência do fan-out nacional+global, nem por que uma chamada falhou. Esta lição instrumenta o assistente — e mostra a armadilha de latência que pode degradar <em>toda</em> chamada que move dinheiro.
+  </div>
+
+  <h2>1 · O hook: <code>ChatModelListener</code></h2>
+  <p>Interface <code>dev.langchain4j.model.chat.listener.ChatModelListener</code> (core) com <strong>três métodos default vazios</strong>: <code>onRequest</code>, <code>onResponse</code>, <code>onError</code> — implemente só o que precisar. O <code>attributes()</code> é um <strong>Map mutável compartilhado</strong> entre <code>onRequest</code>→<code>onResponse</code>/<code>onError</code>: use-o para carregar span, timestamp e o <strong>txn id</strong> da operação bancária.</p>
+  <p><strong>Onde dispara:</strong> os callbacks vêm do <strong>template <code>ChatModel.chat()</code> do core</strong> (em volta do <code>doChat</code>), <strong>não</strong> do <code>BedrockChatModel.doChat</code>. O Bedrock herda; <code>provider()</code> = <code>ModelProvider.AMAZON_BEDROCK</code>. Registre via <code>BedrockChatModel.builder().listeners(...)</code>.</p>
+
+  <h2>2 · A armadilha de latência (e a do onError)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Listeners rodam SÍNCRONOS e SEQUENCIAIS na thread chamadora.</strong> Um export bloqueante (HTTP ao LangFuse) <strong>dentro</strong> do listener adiciona latência a <strong>toda</strong> chamada do modelo — crítico em operações que movem dinheiro. <strong>Exporte fora da thread</strong> (OTel <code>BatchSpanProcessor</code> / OTLP assíncrono). E mais: em 1.16.2, o <code>ChatModelErrorContext</code> <strong>não expõe resposta parcial</strong> no erro (o javadoc menciona, a classe não tem) — não conte com isso.</p>
+  </blockquote>
+
+  <h2>3 · O padrão: OpenTelemetry GenAI</h2>
+  <ul>
+    <li><strong>Provedor:</strong> <code>gen_ai.provider.name = "aws.bedrock"</code> (Required) — substitui o <strong>deprecado</strong> <code>gen_ai.system</code>.</li>
+    <li><strong>Span:</strong> nome <code>"{gen_ai.operation.name} {gen_ai.request.model}"</code>; Required: <code>gen_ai.operation.name</code> + <code>gen_ai.provider.name</code>.</li>
+    <li><strong>Tokens:</strong> <code>gen_ai.usage.input_tokens</code> / <code>gen_ai.usage.output_tokens</code> (entrada inclui cache).</li>
+    <li><strong>Métricas (Histogramas):</strong> <code>gen_ai.client.operation.duration</code> (<strong>Required</strong>, <code>s</code>) e <code>gen_ai.client.token.usage</code> (<strong>Recommended</strong>, <code>{token}</code>) — não são "duas obrigatórias".</li>
+    <li><strong>Status:</strong> convenções GenAI em <strong>Development/experimental</strong> (não estáveis — fixe a versão). Opt-in: <code>OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental</code>.</li>
+  </ul>
+
+  <h2>4 · LangFuse: não há SDK Java → é um backend OTel</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Não existe SDK Java/JVM oficial do LangFuse</strong> (só Python e JS/TS). Para um app Java/Micronaut, <strong>não procure um <code>langfuse-java</code></strong> — o LangFuse age como <strong>backend OpenTelemetry</strong>: aponte um exporter OTLP padrão ao endpoint <code>/api/public/otel</code> (cloud: <code>https://cloud.langfuse.com/api/public/otel</code>; self-host: <code>&lt;host&gt;/api/public/otel</code>; Basic auth) e emita spans <code>gen_ai.*</code>. (LangSmith é gerenciado/Python-first — detalhe no ecossistema, Lição 19.)</p>
+  </blockquote>
+
+  <h2>5 · Fiação no Micronaut</h2>
+  <ul>
+    <li>O <strong>micronaut-langchain4j não tem hook de observabilidade próprio</strong>. O escape documentado é um bean <code>BeanCreatedEventListener</code> que customiza o builder do modelo (para chamar <code>.listeners(...)</code> quando o modelo vem de config). Definir o <code>BedrockChatModel</code> como <code>@Factory</code> e passar <code>.listeners(...)</code> é DI <strong>padrão do Micronaut</strong> (válido, mas não é feature documentada do micronaut-langchain4j).</li>
+    <li>Métricas/tracing vêm do <strong>Micrometer + Tracing (OTel)</strong> do próprio Micronaut.</li>
+    <li>Módulo opcional <code>langchain4j-micrometer-metrics</code>: <code>MicrometerMetricsChatModelListener(meterRegistry)</code>; <code>langchain4j-observation</code> faz a ponte com a Observation API. Ambos <code>@Experimental</code>.</li>
+  </ul>
+
+  <h2>6 · O listener do banco (esboço)</h2>
+  <pre><code>public class BankObservabilityListener implements ChatModelListener {
+    private static final Object KEY_TXN = "bankTxnId";
+    private static final Object KEY_T0  = "startNanos";
+
+    @Override public void onRequest(ChatModelRequestContext ctx) {
+        ctx.attributes().put(KEY_T0, System.nanoTime());
+        ctx.attributes().put(KEY_TXN, java.util.UUID.randomUUID().toString());
+        // inicie a span OTel: gen_ai.operation.name=chat, gen_ai.provider.name=aws.bedrock
+    }
+    @Override public void onResponse(ChatModelResponseContext ctx) {
+        long t0 = (long) ctx.attributes().get(KEY_T0);
+        // grave gen_ai.client.operation.duration (s) + input/output tokens; encerre a span OK
+    }
+    @Override public void onError(ChatModelErrorContext ctx) {
+        // ctx.error() é Throwable; SEM resposta parcial em 1.16.2. Encerre a span com erro.
+    }
+}
+// Registro: BedrockChatModel.builder().listeners(List.of(new BankObservabilityListener()))  // listeners(List&lt;ChatModelListener&gt;) ou varargs ChatModelListener... — ambos válidos
+// EXPORTE fora da thread (BatchSpanProcessor/OTLP async) — listeners são síncronos.</code></pre>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. O que torna perigoso exportar telemetria dentro de um ChatModelListener?</p>
+      <button class="opt" data-k="a">Nada: os listeners rodam num pool assíncrono dedicado</button>
+      <button class="opt" data-k="b">Rodam síncronos na thread chamadora; bloqueio vira latência</button>
+      <button class="opt" data-k="c">Eles só disparam no erro, nunca no caminho de sucesso</button>
+      <p class="explain">Os callbacks são síncronos e sequenciais na thread da chamada. Um export bloqueante penaliza toda chamada — exporte fora da thread (BatchSpanProcessor/OTLP async).</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. Qual atributo OTel identifica o provedor numa span de Bedrock?</p>
+      <button class="opt" data-k="a">gen_ai.system = "bedrock", o atributo padrão atual</button>
+      <button class="opt" data-k="b">gen_ai.provider.name = "aws.bedrock" (gen_ai.system é deprecado)</button>
+      <button class="opt" data-k="c">aws.service = "bedrock-runtime", do namespace da AWS</button>
+      <p class="explain">gen_ai.provider.name é o atributo Required atual; para Bedrock o valor é "aws.bedrock". O antigo gen_ai.system está deprecado.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Como integrar LangFuse num app Java/Micronaut?</p>
+      <button class="opt" data-k="a">Pela dependência oficial langfuse-java no Maven Central</button>
+      <button class="opt" data-k="b">Não há SDK Java: exporte via OTLP para /api/public/otel</button>
+      <button class="opt" data-k="c">Só via o SDK Python rodando num sidecar ao lado da JVM</button>
+      <p class="explain">LangFuse não tem SDK Java/JVM (só Python e JS/TS). Ele age como backend OpenTelemetry: aponte um exporter OTLP padrão ao endpoint /api/public/otel.</p>
+    </div>
+  </div>
+
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/observability/">LangChain4j — Observability (doc oficial)</a>, as convenções OTel GenAI (repo <code>open-telemetry/semantic-conventions-genai</code>) e a <a href="https://langfuse.com/integrations/native/opentelemetry">integração OTel do LangFuse</a>. API conferida na fonte 1.16.2 (<code>ChatModelListener</code>, <code>ChatModel.chat</code>). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver o listener emitindo uma span OTel real com o <code>BatchSpanProcessor</code> e os atributos <code>gen_ai.*</code>, ou a config OTLP do Micronaut apontando para o LangFuse? É só pedir. <strong>Próxima (Lição 18):</strong> escala e resiliência.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0016-contexto-a-fundo.html">← 16 · Contexto a fundo</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 17 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-15-observabilidade.md">curso/modulo-15</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

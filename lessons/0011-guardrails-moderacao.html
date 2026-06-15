@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 11 — Guardrails e moderação: defendendo a saída (sem confundir com autorização)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 2 · LangChain4j · Lição 11</p>
+  <h1>Guardrails e moderação: defendendo a saída</h1>
+  <p class="lede">A <a href="0010-saida-estruturada.html">Lição 10</a> deixou um objeto <strong>tipado, mas não-confiável</strong>. Aqui está a <strong>rede de defesa</strong> — e a separação cuidadosa de <strong>dois sistemas que só compartilham a palavra "guardrail"</strong>, sob uma fronteira inegociável: <strong>guardrail ≠ autorização</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> num banco, a saída do modelo pode vazar PII (<em>Personally Identifiable Information</em> / Informação Pessoalmente Identificável), alucinar um valor ou obedecer a uma injeção. O ganho desta lição: defender essa saída com um <code>OutputGuardrail</code> que <strong>reprompta</strong> + o <strong>Bedrock Guardrails</strong> como rede da plataforma — sabendo que isso é <strong>defesa probabilística</strong>, e que a trava de acesso continua <strong>determinística</strong>.
+  </div>
+
+  <h2>1 · Dois sistemas de guardrail (não confunda)</h2>
+  <table>
+    <thead><tr><th>Camada</th><th>O que é</th><th>Você escreve…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>LangChain4j guardrails</strong></td><td>checagens <strong>no seu código</strong>, in-process</td><td><strong>código</strong> (Java)</td></tr>
+      <tr><td><strong>AWS Bedrock Guardrails</strong></td><td>filtro de conteúdo <strong>do provedor</strong></td><td><strong>configuração</strong> (na AWS)</td></tr>
+    </tbody>
+  </table>
+  <p>Elas <strong>compõem</strong> (defesa em profundidade) e o Bedrock as cabla em linha separada da saída estruturada (Lição 10).</p>
+  <div class="warn">
+    <strong>⚠️ Todo o framework de guardrails do LangChain4j é <code>@Experimental</code> em 1.16.2</strong> — assinaturas podem mudar entre <em>minors</em>. Trate-o como uma camada útil, <strong>não</strong> como controle de segurança GA (<em>General Availability</em> / Disponibilidade Geral) — o que aliás reforça o ponto da §5.
+  </div>
+
+  <h2>2 · LangChain4j: Input e Output guardrails (verificado)</h2>
+  <ul>
+    <li><strong><code>InputGuardrail</code></strong> — <code>validate(UserMessage)</code>; helpers <em>default</em> <code>success()</code>, <code>failure(String)</code>, <code>fatal(String)</code>. <strong>Sem retry/reprompt</strong>: a 1ª falha encerra a cadeia e vira <code>GuardrailException</code>. Para: pegar injeção/abuso <strong>antes</strong> do modelo.</li>
+    <li><strong><code>OutputGuardrail</code></strong> — <code>validate(AiMessage)</code>; além de <code>success()</code>, tem <strong><code>reprompt(msg, reprompt)</code></strong> (re-invoca com novo prompt) e <strong><code>retry(msg)</code></strong> (re-invoca com o mesmo).</li>
+  </ul>
+  <blockquote class="insight">
+    <p><span class="star">★ Armadilha verificada —</span> <strong><code>reprompt(...)</code>/<code>retry(...)</code> são métodos <code>default</code> da INTERFACE <code>OutputGuardrail</code>, não estáticos de <code>OutputGuardrailResult</code>.</strong> <code>OutputGuardrailResult.reprompt(...)</code> <strong>não compila</strong>; e o estático <code>OutputGuardrailResult.failure(...)</code> recebe <code>List&lt;Failure&gt;</code>, não <code>String</code>. Chame <code>reprompt(...)</code> <strong>direto</strong> dentro do <code>validate(...)</code>.</p>
+  </blockquote>
+  <p><strong>Registro:</strong> <code>@InputGuardrails({...})</code> e <code>@OutputGuardrails(value={...}, maxRetries=2)</code> (pacote <code>dev.langchain4j.service.guardrail</code>). Precedência: <strong>método &gt; classe &gt; builder</strong>. <code>maxRetries</code> é o <strong>total de invocações do modelo</strong> — a chamada inicial conta como a 1ª tentativa (verificado no <code>OutputGuardrailExecutor</code> 1.16.2: <code>maxAttempts = maxRetries</code>, sem <code>+1</code>): default 2 → <strong>até 2</strong> invocações (inicial + 1 reprompt); <code>0</code>→1; negativo→trata como 2; esgotou → <code>OutputGuardrailException</code>. A entrada <strong>não</strong> tem <code>maxRetries</code>.</p>
+  <pre><code>class PromptInjectionGuard implements InputGuardrail {
+    @Override public InputGuardrailResult validate(UserMessage um) {
+        String t = um.singleText().toLowerCase();
+        if (t.contains("ignore as instrucoes") || t.contains("ignore previous"))
+            return failure("Possivel prompt injection");   // helper default; sem retry na entrada
+        return success();
+    }
+}
+
+class PiiPtBrGuard implements OutputGuardrail {
+    @Override public OutputGuardrailResult validate(AiMessage resp) {
+        String txt = resp.text();
+        if (txt == null || txt.isBlank())
+            return reprompt("Resposta vazia", "Responda em pt-BR, em JSON valido."); // re-invoca c/ novo prompt
+        if (vazaContaDeOutroCliente(txt))
+            return reprompt("Possivel vazamento de PII", "NAO inclua dados de outro cliente.");
+        return success();
+    }   // reprompt/retry: metodos DEFAULT da interface — nunca OutputGuardrailResult.reprompt(...)
+}
+
+interface BankAssistant {
+    @InputGuardrails(PromptInjectionGuard.class)
+    @OutputGuardrails(value = PiiPtBrGuard.class, maxRetries = 2)  // 2 = total de invocações (inicial + 1 reprompt)
+    Triagem triar(@V("msg") String msg);
+}</code></pre>
+
+  <h2>3 · AWS Bedrock Guardrails (a rede da plataforma)</h2>
+  <p>Sistema <strong>separado</strong>, do provedor. Políticas (docs AWS): <strong>filtros de conteúdo</strong> (incl. <strong>Prompt Attack</strong> = jailbreak/injection), <strong>tópicos negados</strong>, <strong>filtros de palavra</strong>, <strong>informação sensível</strong> (PII: bloquear <strong>ou</strong> mascarar) e <strong>contextual grounding check</strong> (anti-alucinação, p/ RAG — <em>Retrieval-Augmented Generation</em> / Geração Aumentada por Recuperação).</p>
+  <pre><code>BedrockGuardrailConfiguration gc = BedrockGuardrailConfiguration.builder()
+    .guardrailIdentifier("gr-xxxxxxxx")
+    .guardrailVersion("DRAFT")
+    .streamProcessingMode(BedrockGuardrailConfiguration.ProcessingMode.SYNC) // SYNC = veredito antes do token
+    .build();   // 3 campos; NAO ha 'trace' (langchain4j fixa GuardrailTrace.ENABLED)
+
+BedrockChatRequestParameters params = BedrockChatRequestParameters.builder()
+    .guardrailConfiguration(gc)   // builder = guardrailConfiguration(...); getter = bedrockGuardrailConfiguration()
+    .build();</code></pre>
+  <p><strong>In-band</strong> (no Converse) exige IAM (<em>Identity and Access Management</em> / Gestão de Identidade e Acesso) <code>bedrock:InvokeModel</code>; <strong>out-of-band</strong> (pré-triagem) usa <code>ApplyGuardrail</code> (<code>bedrock:ApplyGuardrail</code>). O <code>GuardrailAssessment</code> traz <code>action</code> (<code>ANONYMIZED|BLOCKED|NONE|UNKNOWN</code>) e <code>policy</code> — <strong>flags de avaliação, não um veredito de permissão</strong>.</p>
+
+  <h2>4 · Moderação: para Claude-on-Bedrock, Guardrails É a moderação</h2>
+  <div class="warn">
+    O <code>langchain4j-core</code> tem a SPI (<em>Service Provider Interface</em> / Interface de Provedor de Serviço) <code>ModerationModel</code>, mas as implementações em 1.16.2 são <strong>só OpenAI, Mistral e Watsonx</strong> — <strong>não há <code>ModerationModel</code> para Bedrock/Anthropic</strong>. Logo, neste banco <strong>não existe</strong> <code>moderate()</code>; a moderação <strong>é</strong> o Bedrock Guardrails (in-band ou via <code>ApplyGuardrail</code>).
+  </div>
+
+  <h2>5 · A fronteira que ancora tudo: guardrail ≠ autorização</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Guardrails (as duas camadas) são defesa probabilística, NUNCA a camada de autorização.</strong> Onde a API mostra isso: o Javadoc do <code>@InputGuardrails</code> diz <em>"It does not replace a moderation model"</em>; o <code>GuardrailAssessment</code> expõe <strong>flags</strong> (<code>BLOCKED</code>/<code>ANONYMIZED</code>), não allow/deny; e o <code>ProcessingMode.ASYNC</code> <strong>libera tokens antes</strong> de terminar a avaliação — prova de que é <em>best-effort</em>. A autorização real é <strong>IAM</strong> (<code>bedrock:InvokeModel</code>, condição <code>bedrock:GuardrailIdentifier</code>) <strong>+ a sua autorização de negócio no código</strong> (Lição 1; filtro forçado pelo servidor da Lição 9). Guardrail reduz risco residual; <strong>não substitui</strong> controle de acesso.</p>
+  </blockquote>
+  <div class="warn">
+    <strong>Nota de compliance:</strong> conteúdo <strong>bloqueado</strong> aparece em <strong>texto puro</strong> nos Bedrock Model Invocation Logs, se ligados — atenção a PII em pt-BR.
+  </div>
+  <pre><code>entrada → [InputGuardrail (app)] → modelo  ⟵ [Bedrock Guardrails (provedor)]
+        → [OutputGuardrail (app, pode repromptar)] → resposta
+        — e a AUTORIZACAO (IAM + codigo deterministico) por fora de tudo</code></pre>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="b">
+      <p>1. O que distingue as duas famílias de "guardrail"?</p>
+      <button class="opt" data-k="a">São a mesma coisa, com nomes diferentes por versão</button>
+      <button class="opt" data-k="b">LangChain4j roda no seu código; Bedrock é do provedor</button>
+      <button class="opt" data-k="c">Uma valida a entrada e a outra valida só a saída</button>
+      <p class="explain">Compartilham só a palavra. Uma é código in-process (que você escreve); a outra é config gerenciada na AWS, aplicada à chamada.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>2. Um OutputGuardrail bloqueou um vazamento de PII. Isso é a sua autorização?</p>
+      <button class="opt" data-k="a">Sim: o guardrail é a camada que decide quem acessa o quê</button>
+      <button class="opt" data-k="b">Sim, desde que o Bedrock Guardrails também esteja ligado</button>
+      <button class="opt" data-k="c">Não: guardrail é defesa probabilística; autz é IAM/código</button>
+      <p class="explain">Guardrail é best-effort (ASYNC chega a liberar tokens antes de avaliar). Autorização = IAM + sua lógica determinística. Guardrail só reduz risco residual.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Como sinalizar "resposta ruim, tente de novo" num OutputGuardrail?</p>
+      <button class="opt" data-k="a">Retornando OutputGuardrailResult.reprompt(...), o estático</button>
+      <button class="opt" data-k="b">Chamando reprompt(...), método default da interface</button>
+      <button class="opt" data-k="c">Lançando OutputGuardrailException de dentro do validate</button>
+      <p class="explain">reprompt/retry são métodos default da interface OutputGuardrail. O estático em OutputGuardrailResult não existe (e failure recebe List&lt;Failure&gt;, não String).</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.langchain4j.dev/tutorials/guardrails">LangChain4j — Guardrails (doc oficial)</a> (lembre: <code>@Experimental</code>), e a <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html">AWS — Bedrock Guardrails</a> (políticas, <code>ApplyGuardrail</code>). API conferida na <a href="https://raw.githubusercontent.com/langchain4j/langchain4j/1.16.2/langchain4j-core/src/main/java/dev/langchain4j/guardrail/OutputGuardrail.java">fonte 1.16.2</a>. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer ver um <code>OutputGuardrail</code> que valida a saída contra os <em>chunks</em> recuperados (faithfulness/grounding da Lição 5), ou um Bedrock Guardrail de PII mascarando CPF/conta em pt-BR? É só pedir. <strong>Próxima (Lição 12):</strong> integração <code>micronaut-langchain4j</code>.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0010-saida-estruturada.html">← 10 · Saída estruturada</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 11 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-09b-guardrails-moderacao.md">curso/modulo-09b</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>
