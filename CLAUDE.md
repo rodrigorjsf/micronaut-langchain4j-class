@@ -16,3 +16,9 @@ Foundation First — Knowledge built on a weak foundation, no matter its size, i
 - Editing a lesson (`lessons/**/*.html`, `index.html`) → `.claude/rules/lesson-authoring.md`
 - Editing a source draft (`curso/**/*.md`) → `.claude/rules/source-drafts.md`
 - Any content file (lessons or curso) → `.claude/rules/content-grounding.md` (pt-BR/English split, acronym expansion, grounding discipline, Bedrock platform, version truths)
+
+## Applied Learning
+
+When something fails repeatedly, when User has to re-explain, or when a workaround is found for a platform/tool limitation, add a one-line bullet here. Keep each bullet under 15 words. No explanations. Only add things that will save time in future sessions.
+
+- No SVG→PNG renderer in WSL (no pip/cairosvg); preview animated diagrams as HTML in `docs/previews/`.
