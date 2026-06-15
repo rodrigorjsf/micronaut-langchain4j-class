@@ -26,6 +26,12 @@ Fontes de alta confiança para fundamentar as lições. Conhecimento vem daqui, 
   Use para: segurança — prompt injection, _insecure output handling_, _excessive agency_ (Módulo 13). _(Confirmar versão vigente ao chegar lá.)_
 - [langgraph4j (comunidade)](https://github.com/langgraph4j/langgraph4j)
   Use para: orquestração de grafos/estado em Java (projeto de terceiros; funciona com LangChain4j e Spring AI).
+- [`langchain4j-skills` — módulo (tag 1.16.2)](https://github.com/langchain4j/langchain4j/tree/1.16.2/langchain4j-skills) · [`Skills.java`](https://github.com/langchain4j/langchain4j/blob/1.16.2/langchain4j-skills/src/main/java/dev/langchain4j/skills/Skills.java) · [tutorial `skills.md`](https://github.com/langchain4j/langchain4j/blob/1.16.2/docs/docs/tutorials/skills.md)
+  **Fonte da Lição 20.** Use para: `Skills`/`Skill`/`FileSystemSkillLoader`, `activate_skill`/`read_skill_resource`, progressive disclosure. Coordenada em *lockstep* com o core (confirmar POM no Maven Central).
+- [Agent Skills — especificação aberta (agentskills.io)](https://agentskills.io) · [integração "tool-based agents"](https://agentskills.io/integrate-skills)
+  Use para: o formato `SKILL.md` e os três estágios (Discovery → Activation → Execution). É a spec que o `langchain4j-skills` referencia.
+- [`ToolProvider` / `ToolSearchStrategy` — pacote `service.tool` (tag 1.16.2)](https://github.com/langchain4j/langchain4j/tree/1.16.2/langchain4j/src/main/java/dev/langchain4j/service/tool)
+  **Fonte da Lição 7 (§B·6, tool retrieval).** Use para: `ToolProvider`/`ToolProviderResult`, `ToolSearchStrategy`/`VectorToolSearchStrategy`, `SearchBehavior`.
 
 ## Wisdom (Communities)
 

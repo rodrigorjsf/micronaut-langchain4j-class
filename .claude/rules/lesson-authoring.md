@@ -23,7 +23,16 @@ Every lesson keeps its `<style>` and `<script>` blocks BYTE-IDENTICAL to `lesson
 
 ## Visual teaching (pillar)
 
-Teach non-trivial structure with COLORED diagrams (architecture / flow / sequence / state), not text + code alone — especially the real-world reference architecture of a resilient, secure, scalable agentic backend. Default technique: inline SVG embedded in the lesson HTML, reusing the palette via CSS custom properties (`fill="var(--accent)"`, `var(--gold)`, `var(--warn)`, `var(--rule)`) so figures inherit the design system. Color is mandatory, to enrich and distinguish elements. Avoid JS-dependent renderers (e.g. Mermaid) — they would break the byte-identical `<script>`; draw.io is fine when exported to inline SVG.
+Teach non-trivial structure with COLORED, ANIMATED diagrams (architecture / flow / sequence / state), not text + code alone — especially the real-world reference architecture of a resilient, secure, scalable agentic backend. Color is mandatory, to enrich and distinguish elements.
+
+**Preferred shape: decision-flow with impact.** When applicable, model the topic as a *flowchart of decisions* (diamonds = choices) whose leaves state the API/option **and its consequence** (an `impacto:` line), not as a flat linear pipeline. This teaches *why* to choose, not just *what* the steps are. (User directive, repeated.)
+
+**Technique — inline SVG, palette via CSS, animated by CSS (no JS):**
+- Reuse the palette with **inline style**, NOT presentation attributes: write `style="fill:var(--accent)"` — `fill="var(--accent)"` (attribute form) does NOT resolve `var()` and renders nothing. Use `var(--accent) #0b5c63`, `var(--gold)`, `var(--warn)`, `var(--rule)`, `var(--accent-soft)`, `var(--muted)`, `var(--ink)`; for text on dark fills use `#fff` (optionally `opacity:.85`).
+- **Animate with CSS**, never JS (JS would break the byte-identical `<script>`). Add the keyframes in a **second `<style>` block placed in the body** (e.g. just before the `<figure>`). This is safe: `scripts/validate_lessons.py` captures only the FIRST `<style>` (the head design system) for its byte-identity check, so a later scoped block is ignored by the check while still applying. House idioms: flowing connectors (`stroke-dasharray` + animated `stroke-dashoffset`), a pulsing ring on the active/decision node (`@keyframes` opacity), a traveling particle on a single-path flow (`transform-box:view-box` + `transform:translateY`), hover lift on nodes.
+- **Always guard motion**: include `@media (prefers-reduced-motion:reduce){...animation:none}` and `@media print{...animation:none}` in the scoped block.
+- `<svg>`, `<g>`, `<rect>`, `<path>`, `<polygon>`, `<text>`, `<circle>`, `<defs>`, `<filter>`, `<feDropShadow>`, `<figure>`, `<figcaption>` are NOT parity-checked tags, so they never break validation — but any `<code>`/`<p>`/`<div>`/`<span>` you add must still open/close balanced.
+- Avoid JS renderers (Mermaid etc.). draw.io is fine when exported to inline SVG.
 
 ## Numbering discipline
 

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 22 — Arquitetura de referência: o backend agêntico do banco, ponta a ponta</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 5 · Avançado · Lição 22 (capstone)</p>
+  <h1>Arquitetura de referência: o backend agêntico do banco, ponta a ponta</h1>
+  <p class="lede">Esta lição não traz API nova — ela <strong>monta</strong> tudo o que a trilha aterrou numa arquitetura escalável, segura e performática, em dois níveis: <strong>macro</strong> (componentes e integrações) e <strong>micro</strong> (o fluxo seguro de uma requisição, com a decisão e o impacto em cada gate).</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> é aqui que as peças viram <em>sistema</em>: o loop agêntico, as tools determinísticas, os guardrails, as skills, o RAG, a observabilidade e a escala — todos sobre <strong>Claude Sonnet via AWS Bedrock</strong>. Cada componente abaixo aponta para a lição que o verificou; nada de API solta de memória.
+  </div>
+
+  <style>
+  /* Diagramas do capstone (escopado; não é o primeiro style do documento). Anima por CSS. */
+  .cxconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:cxDash 1.1s linear infinite}
+  .cxdash{stroke:var(--muted);stroke-width:1.6;fill:none;stroke-dasharray:3 4;animation:cxDash 1.5s linear infinite;opacity:.65}
+  .cxbox{transition:transform .16s ease;cursor:default}
+  .cxbox:hover{transform:translateY(-2px)}
+  .cxpulse{animation:cxPulse 2.4s ease-in-out infinite}
+  @keyframes cxDash{to{stroke-dashoffset:-26}}
+  @keyframes cxPulse{0%,100%{opacity:.25}50%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.cxconn,.cxdash,.cxpulse{animation:none}}
+  @media print{.cxconn,.cxdash,.cxpulse{animation:none}}
+  </style>
+
+  <h2>1 · Macro — componentes e integrações</h2>
+  <p>A requisição entra pela borda, desce pela camada agêntica e pela camada determinística de tools, e se integra ao Bedrock, ao <em>core</em> bancário, ao RAG e à observabilidade. O cérebro (o loop) é a parte <strong>não-confiável</strong>; as travas reais ficam fora dele.</p>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 700 440" role="img" aria-labelledby="mctitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="mctitle">Arquitetura macro: cliente, API Micronaut, camada agêntica, tools determinísticas e as integrações com Bedrock, core bancário, RAG e observabilidade</title>
+    <defs><filter id="mcShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="cxbox"><rect x="40" y="16" width="300" height="36" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#mcShadow)"/>
+      <text x="190" y="39" text-anchor="middle" style="fill:var(--accent);font-size:12.5px;font-weight:700">Cliente — app / web</text></g>
+    <path class="cxconn" d="M190 52 L190 70"/><path d="M184 70 L196 70 L190 76 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="40" y="78" width="300" height="48" rx="10" style="fill:var(--accent)" filter="url(#mcShadow)"/>
+      <text x="190" y="100" text-anchor="middle" style="fill:#fff;font-size:12.5px;font-weight:700">🔒 API HTTP — Micronaut</text>
+      <text x="190" y="116" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">TLS · authN/Z · rate limit · identidade da sessão</text></g>
+    <path class="cxconn" d="M190 126 L190 144"/><path d="M184 144 L196 144 L190 150 Z" style="fill:var(--accent)"/>
+
+    <rect class="cxpulse" x="36" y="148" width="308" height="74" rx="12" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <g class="cxbox"><rect x="40" y="152" width="300" height="66" rx="10" style="fill:var(--gold)" filter="url(#mcShadow)"/>
+      <text x="190" y="174" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">Camada agêntica — AiServices (loop ReAct)</text>
+      <text x="190" y="191" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.92">🛡 guardrail entrada · tool gating · guardrail saída</text>
+      <text x="190" y="207" text-anchor="middle" style="fill:#fff;font-size:9px;opacity:.82">static / tool-search / skills (Lições 7 e 20)</text></g>
+    <path class="cxconn" d="M190 218 L190 236"/><path d="M184 236 L196 236 L190 242 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="40" y="244" width="300" height="58" rx="10" style="fill:var(--accent)" filter="url(#mcShadow)"/>
+      <text x="190" y="266" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">🔒 Tools determinísticas</text>
+      <text x="190" y="283" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">auth · validação · roteamento nacional/global</text>
+      <text x="190" y="297" text-anchor="middle" style="fill:#fff;font-size:9px;opacity:.78">idempotência · erro como dado</text></g>
+    <path class="cxconn" d="M190 302 L190 320"/><path d="M184 320 L196 320 L190 326 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="40" y="328" width="300" height="34" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#mcShadow)"/>
+      <text x="190" y="350" text-anchor="middle" style="fill:var(--accent);font-size:12px;font-weight:700">Resposta moldada ao cliente</text></g>
+
+    <path class="cxconn" d="M340 178 C372 178 376 142 400 142"/><path d="M400 136 L400 148 L406 142 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="400" y="120" width="280" height="44" rx="10" style="fill:#fff;stroke:var(--accent);stroke-width:1.2" filter="url(#mcShadow)"/>
+      <text x="414" y="139" style="fill:var(--accent);font-size:11px;font-weight:700">AWS Bedrock — Claude Sonnet (200K)</text>
+      <text x="414" y="154" style="fill:var(--muted);font-size:9.5px">chat · prompt caching · tool use</text></g>
+    <path class="cxconn" d="M340 195 L400 195"/><path d="M400 189 L400 201 L406 195 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="400" y="174" width="280" height="44" rx="10" style="fill:#fff;stroke:var(--accent);stroke-width:1.2" filter="url(#mcShadow)"/>
+      <text x="414" y="193" style="fill:var(--accent);font-size:11px;font-weight:700">Vector store + Cohere (Bedrock)</text>
+      <text x="414" y="208" style="fill:var(--muted);font-size:9.5px">RAG · embeddings multilíngues</text></g>
+    <path class="cxconn" d="M340 268 L400 268"/><path d="M400 262 L400 274 L406 268 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="400" y="246" width="280" height="44" rx="10" style="fill:#fff;stroke:var(--accent);stroke-width:1.2" filter="url(#mcShadow)"/>
+      <text x="414" y="265" style="fill:var(--accent);font-size:11px;font-weight:700">Core bancário — APIs de produto</text>
+      <text x="414" y="280" style="fill:var(--muted);font-size:9.5px">boleto · Pix · cartão · investimentos</text></g>
+    <path class="cxconn" d="M340 290 C372 290 376 318 400 318"/><path d="M400 312 L400 324 L406 318 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="400" y="298" width="280" height="42" rx="10" style="fill:#fff;stroke:var(--accent);stroke-width:1.2" filter="url(#mcShadow)"/>
+      <text x="414" y="316" style="fill:var(--accent);font-size:11px;font-weight:700">Memória durável (fora da janela)</text>
+      <text x="414" y="331" style="fill:var(--muted);font-size:9.5px">estado que sobrevive à eviction</text></g>
+
+    <path class="cxdash" d="M190 362 L190 384"/>
+    <g class="cxbox"><rect x="40" y="386" width="640" height="38" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2" filter="url(#mcShadow)"/>
+      <text x="360" y="409" text-anchor="middle" style="fill:var(--accent);font-size:10.5px;font-weight:700">Observabilidade — ChatModelListener · OpenTelemetry GenAI → LangFuse (atravessa tudo)</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura 1 — Macro: a coluna central é o caminho da requisição; o anel pulsa no <strong>loop agêntico</strong> (a parte não-confiável). 🔒 marca onde mora a segurança; as caixas à direita são as integrações (Bedrock, RAG, <em>core</em>, memória) e a faixa inferior é a observabilidade transversal.</figcaption>
+  </figure>
+
+  <h2>2 · Micro — o fluxo seguro de uma requisição</h2>
+  <p>Defesa em profundidade: cada <strong>gate</strong> é uma decisão, e o caminho de falha tem um <strong>impacto</strong> mapeado ao OWASP LLM Top 10 (<a href="0015-seguranca-owasp.html">Lição 15</a>). A regra-mestra: o modelo <em>propõe</em>; a sua camada determinística <em>autoriza</em>.</p>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 700 530" role="img" aria-labelledby="mititle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="mititle">Fluxo seguro de uma requisição como decisões: identidade pelo servidor, guardrail de entrada, gating de tools, autorização determinística, guardrail de saída — com o impacto OWASP de cada falha</title>
+    <defs><filter id="miShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="cxbox"><rect x="60" y="12" width="280" height="32" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#miShadow)"/>
+      <text x="200" y="33" text-anchor="middle" style="fill:var(--accent);font-size:12px;font-weight:700">Requisição do cliente</text></g>
+    <path class="cxconn" d="M200 44 L200 60"/><path d="M194 60 L206 60 L200 66 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="60" y="68" width="280" height="44" rx="10" style="fill:var(--accent)" filter="url(#miShadow)"/>
+      <text x="200" y="88" text-anchor="middle" style="fill:#fff;font-size:11.5px;font-weight:700">🔒 Identidade pelo servidor</text>
+      <text x="200" y="104" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">bind do clienteId à sessão — o modelo nunca vê o ID</text></g>
+    <path class="cxconn" d="M200 112 L200 128"/><path d="M194 128 L206 128 L200 134 Z" style="fill:var(--accent)"/>
+
+    <polygon points="200,136 300,174 200,212 100,174" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#miShadow)"/>
+    <text x="200" y="170" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Entrada suspeita?</text>
+    <text x="200" y="186" text-anchor="middle" style="fill:var(--muted);font-size:10px">(injeção / PII)</text>
+    <text x="308" y="166" style="fill:var(--warn);font-size:10.5px;font-weight:700">sim</text>
+    <path class="cxconn" d="M300 174 L424 174"/><path d="M424 168 L424 180 L430 174 Z" style="fill:var(--warn)"/>
+    <g class="cxbox"><rect x="430" y="150" width="250" height="48" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#miShadow)"/>
+      <text x="444" y="170" style="fill:var(--warn);font-size:11px;font-weight:700">bloqueia / sanitiza</text>
+      <text x="444" y="187" style="fill:var(--muted);font-size:9.5px">impacto: LLM01 injection · LLM02 (PII)</text></g>
+
+    <text x="212" y="226" style="fill:var(--muted);font-size:10px">não</text>
+    <path class="cxconn" d="M200 212 L200 230"/><path d="M194 230 L206 230 L200 236 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="60" y="238" width="280" height="44" rx="10" style="fill:var(--gold)" filter="url(#miShadow)"/>
+      <text x="200" y="258" text-anchor="middle" style="fill:#fff;font-size:11.5px;font-weight:700">Loop agêntico — tool gating</text>
+      <text x="200" y="274" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">static / tool-search / skills (Lições 7 e 20)</text></g>
+    <path class="cxconn" d="M200 282 L200 298"/><path d="M194 298 L206 298 L200 304 Z" style="fill:var(--accent)"/>
+
+    <polygon class="cxpulse" points="200,300 312,344 200,388 88,344" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="200,306 304,344 200,382 96,344" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#miShadow)"/>
+    <text x="200" y="340" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Ação autorizada?</text>
+    <text x="200" y="356" text-anchor="middle" style="fill:var(--muted);font-size:10px">(regra + authZ)</text>
+    <text x="312" y="336" style="fill:var(--warn);font-size:10.5px;font-weight:700">não</text>
+    <path class="cxconn" d="M304 344 L424 344"/><path d="M424 338 L424 350 L430 344 Z" style="fill:var(--warn)"/>
+    <g class="cxbox"><rect x="430" y="320" width="250" height="48" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#miShadow)"/>
+      <text x="444" y="340" style="fill:var(--warn);font-size:11px;font-weight:700">nega / pede confirmação</text>
+      <text x="444" y="357" style="fill:var(--muted);font-size:9.5px">impacto: LLM06 excessive agency</text></g>
+
+    <text x="212" y="402" style="fill:var(--gold);font-size:10px;font-weight:700">sim</text>
+    <path class="cxconn" d="M200 388 L200 406"/><path d="M194 406 L206 406 L200 412 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="60" y="414" width="280" height="40" rx="10" style="fill:var(--accent)" filter="url(#miShadow)"/>
+      <text x="200" y="432" text-anchor="middle" style="fill:#fff;font-size:11.5px;font-weight:700">Executa a tool · valida · erro como dado</text>
+      <text x="200" y="447" text-anchor="middle" style="fill:#fff;font-size:9px;opacity:.8">saída moldada e mínima (sem PII crua)</text></g>
+    <path class="cxconn" d="M200 454 L200 470"/><path d="M194 470 L206 470 L200 476 Z" style="fill:var(--accent)"/>
+    <g class="cxbox"><rect x="60" y="478" width="280" height="40" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#miShadow)"/>
+      <text x="200" y="496" text-anchor="middle" style="fill:var(--accent);font-size:11.5px;font-weight:700">Guardrail de saída → resposta</text>
+      <text x="200" y="511" text-anchor="middle" style="fill:var(--muted);font-size:9px">reprompt/bloqueia se vazar PII — impacto: LLM05</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura 2 — Micro: o ciclo seguro como <strong>decisões</strong>. Cada losango é um gate; cada caminho de falha (em vermelho) tem o <strong>impacto</strong> OWASP. O anel pulsa na <strong>autorização determinística</strong> — a defesa contra <em>excessive agency</em> (LLM06): o modelo propôs, mas é o seu código que decide.</figcaption>
+  </figure>
+
+  <h2>3 · A montagem: cada peça aponta para a lição que a verificou</h2>
+  <p>O capstone não inventa — ele <strong>conecta</strong>. Onde mora cada preocupação, e onde você confere o código aterrado:</p>
+  <table>
+    <thead><tr><th>Preocupação</th><th>Onde mora no banco</th><th>Lição</th></tr></thead>
+    <tbody>
+      <tr><td>Identidade pelo servidor</td><td><code>@MemoryId</code> / <code>@ToolMemoryId</code> — nunca do modelo</td><td><a href="0004-loop-agentico-tool-calling.html">4</a>, <a href="0007-tools-langchain4j.html">7</a></td></tr>
+      <tr><td>Design e <em>gating</em> de tools</td><td><code>@Tool</code>, <code>ToolProvider</code>, tool-search, skills</td><td><a href="0007-tools-langchain4j.html">7</a>, <a href="0020-agent-skills.html">20</a></td></tr>
+      <tr><td>RAG e embeddings</td><td><code>EmbeddingStore</code>, Cohere via Bedrock, filtro forçado</td><td><a href="0005-rag.html">5</a>, <a href="0009-rag-langchain4j.html">9</a></td></tr>
+      <tr><td>Memória e contexto</td><td><code>ChatMemory</code>, prompt caching, eviction <em>lossy</em></td><td><a href="0008-chatmemory-contexto.html">8</a>, <a href="0016-contexto-a-fundo.html">16</a></td></tr>
+      <tr><td>Saída estruturada</td><td><code>record</code> como contrato; tipado ≠ confiável</td><td><a href="0010-saida-estruturada.html">10</a></td></tr>
+      <tr><td>Guardrails e moderação</td><td><code>Input/OutputGuardrail</code>; Bedrock Guardrails</td><td><a href="0011-guardrails-moderacao.html">11</a></td></tr>
+      <tr><td>Segurança</td><td>OWASP LLM Top 10 (2025); sanitização em camadas</td><td><a href="0015-seguranca-owasp.html">15</a></td></tr>
+      <tr><td>Concorrência</td><td><em>virtual threads</em>, <em>structured concurrency</em></td><td><a href="0013-java25-concorrencia.html">13</a></td></tr>
+      <tr><td>Observabilidade</td><td><code>ChatModelListener</code>, OTel GenAI, LangFuse</td><td><a href="0017-observabilidade.html">17</a></td></tr>
+      <tr><td>Escala e resiliência</td><td>retries empilhados, throttling, fallback (DIY)</td><td><a href="0018-escala-resiliencia.html">18</a></td></tr>
+      <tr><td>Avaliação</td><td>LLM-as-judge, <em>gate</em> de CI</td><td><a href="0021-avaliacao.html">21</a></td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="insight">
+    <p><span class="star">★ Insight — a segurança é arquitetural, não <em>promptual</em>.</span> Repare que <strong>todo</strong> gate do diagrama micro vive na <strong>camada determinística</strong> (azul/dourado), nunca no texto que o modelo lê. Identidade, autorização, validação, idempotência: tudo fora do alcance do <em>prompt injection</em>. O loop agêntico é poderoso <em>porque</em> é cercado — não apesar disso.</p>
+  </blockquote>
+
+  <h2>4 · Honestidade de plataforma: o que o Bedrock dá e o que é DIY</h2>
+  <p>Uma arquitetura honesta nomeia o que <strong>você</strong> constrói:</p>
+  <ul>
+    <li><strong>Loop agêntico</strong>: você o monta com <code>AiServices</code> — o banco <strong>não</strong> usa <em>managed agents</em>; o Bedrock é o caminho de invocação do modelo, não o orquestrador (<a href="0019-ecossistema-honesto.html">Lição 19</a>).</li>
+    <li><strong>Resiliência</strong>: não há <code>FallbackChatModel</code> nem <em>rate limiter</em> prontos — retry/throttling/fallback são seus (<a href="0018-escala-resiliencia.html">Lição 18</a>).</li>
+    <li><strong>Guardrails</strong>: os do LangChain4j são <code>@Experimental</code>; em produção, combine com <strong>Bedrock Guardrails</strong> (<a href="0011-guardrails-moderacao.html">Lição 11</a>).</li>
+    <li><strong>Avaliação</strong>: sem camada nativa em Java — o juiz é um <em>prompt</em> + modelo forte que você escreve (<a href="0021-avaliacao.html">Lição 21</a>).</li>
+  </ul>
+
+  <h2>5 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="c">
+      <p>1. Onde vive a autorização de uma ação que move dinheiro, na arquitetura de referência?</p>
+      <button class="opt" data-k="a">No <em>system prompt</em>, que instrui o modelo a só agir quando autorizado</button>
+      <button class="opt" data-k="b">No próprio modelo, que avalia o risco da ação antes de chamar a tool</button>
+      <button class="opt" data-k="c">Na camada determinística de tools, fora do alcance do <em>prompt</em></button>
+      <p class="explain">O modelo propõe; quem autoriza, valida e executa é a camada determinística — nunca o texto que o modelo lê.</p>
+    </div>
+
+    <div class="q" data-correct="a">
+      <p>2. No fluxo micro, qual o impacto OWASP do gate "Ação autorizada?"</p>
+      <button class="opt" data-k="a">Conter LLM06 (<em>excessive agency</em>): o modelo propõe, seu código decide</button>
+      <button class="opt" data-k="b">Conter LLM01 (<em>prompt injection</em>) sanitizando a entrada do usuário</button>
+      <button class="opt" data-k="c">Conter LLM05 (<em>improper output</em>) reescrevendo a resposta final ao cliente</button>
+      <p class="explain">O gate de autorização determinística é a defesa contra <em>excessive agency</em> (LLM06): nenhuma ação roda só porque o modelo a sugeriu.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>3. Por que o banco NÃO usa <em>managed agents</em> do Bedrock como orquestrador?</p>
+      <button class="opt" data-k="a">Porque o Bedrock não oferece modelos Claude com <em>tool use</em> nativo</button>
+      <button class="opt" data-k="b">Porque o loop é montado com <code>AiServices</code>; o Bedrock só invoca o modelo</button>
+      <button class="opt" data-k="c">Porque <em>managed agents</em> não suportam a janela de 200K do Sonnet</button>
+      <p class="explain">O banco monta o próprio loop com <code>AiServices</code> (LangChain4j); o Bedrock é o caminho de invocação do modelo, não o orquestrador.</p>
+    </div>
+  </div>
+
+  <h2>6 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>. A mesma referência canônica da Lição 1, relida agora <em>com a trilha inteira na mão</em>: quando um agente se justifica, por que começar simples, e como compor <em>workflows</em> e ferramentas com responsabilidade. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Eu sou seu tutor neste workspace — se qualquer ponto ficou nebuloso (como dividir em vários agentes especializados? onde encaixar HITL e idempotência? como medir o sistema inteiro?), me pergunte e eu aprofundo ou desenho um exercício de arquitetura sob medida.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0021-avaliacao.html">← 21 · Avaliação</a>
+      <a href="index.html">Índice</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 22 (capstone) de uma trilha em construção · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-20-arquitetura-referencia.md">curso/modulo-20</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

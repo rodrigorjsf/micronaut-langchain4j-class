@@ -65,6 +65,32 @@ Mecanismo que reenvia o histórico (o modelo é sem estado); ex.: `MessageWindow
 **`langchain4j-bom`**:
 _Bill of Materials_ que alinha as versões dos módulos; deve ser sempre importado (versionamento duplo: estável + beta).
 
+**`ToolProvider`**:
+SPI que fornece _tools_ dinamicamente por invocação (`provideTools(request)`); `isDynamic()` (padrão `false`) re-avalia a cada chamada do loop. É o **substrato comum** do _tool-search_ e das _skills_.
+
+**Tool retrieval (RAG-sobre-tools)**:
+Expor só as _tools_ relevantes ao turno em vez do catálogo inteiro. Dois caminhos: **embutido** (`ToolSearchStrategy`, o **modelo** dispara a busca) ou **escrito à mão** (um `ToolProvider` que embute a **mensagem do usuário**).
+
+**`ToolSearchStrategy` / `VectorToolSearchStrategy`**:
+Mecanismo **embutido** (1.16.2, `@Experimental`) de _tool-search_: injeta o meta-tool `tool_search_tool`; o modelo formula a _query_; a busca vetorial revela as _tools_. Liga via `.toolSearchStrategy(...)` no `AiServices`.
+
+**`SearchBehavior`**:
+Enum com `SEARCHABLE` (padrão) e `ALWAYS_VISIBLE`. **Com** uma estratégia anexada, `SEARCHABLE` fica oculto até ser encontrado; **sem** estratégia, tudo permanece visível.
+
+## Agent Skills (langchain4j-skills)
+
+**`langchain4j-skills`**:
+Módulo Java (`@Experimental`/beta) que implementa o padrão aberto **Agent Skills** (formato `SKILL.md`) **sobre o `ToolProvider`**. Coordenada em _lockstep_ com o core: `X.Y.Z-betaN` depende de core `X.Y.Z` (resolva via `langchain4j-bom`). Modelo-agnóstico → roda no Bedrock.
+
+**Skill / `SKILL.md`**:
+Um diretório com um `SKILL.md`: _front matter_ YAML (`name`+`description`, sempre visíveis) + corpo Markdown de instruções + recursos opcionais (`references/`, `scripts/`). `Skill` é **interface** — **não existe anotação `@Skill`**.
+
+**Progressive disclosure (revelação progressiva)**:
+Mostrar só `name`+`description` no catálogo e carregar o corpo **sob demanda** — a disciplina de orçamento de contexto aplicada a **instruções**, não só a _tools_.
+
+**`activate_skill` / `read_skill_resource`**:
+_Tools_ geradas pelo módulo: a primeira carrega o corpo do `SKILL.md` no contexto; a segunda lê um recurso. A ativação é rastreada em memória (atributo `activated_skill`); o modelo nunca toca o _filesystem_.
+
 ## Micronaut / Java
 
 **DI de compilação (Micronaut)**:

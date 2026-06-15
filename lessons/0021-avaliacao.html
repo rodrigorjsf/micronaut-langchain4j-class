@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 21 — Avaliação: medir o assistente sem framework (LLM-as-judge no Bedrock)</title>
+<style>
+  /* ===== Sistema de design das lições (Tufte-inspired). Copiar VERBATIM nas demais lições. ===== */
+  :root{
+    --ink:#1a1a18; --paper:#fbfaf7; --muted:#6b6760; --rule:#e3ded3;
+    --accent:#0b5c63; --accent-soft:#e7f1f1; --gold:#9a6b00; --warn:#8a2e22; --warn-soft:#f6e9e6;
+    --maxw:43rem;
+  }
+  *{box-sizing:border-box}
+  html{font-size:18px}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:3.2rem 1.4rem 5rem}
+  .kicker{font-variant:small-caps; letter-spacing:.06em; color:var(--accent); font-weight:700; font-size:.84rem; margin:0 0 .4rem}
+  h1{font-size:2.05rem; line-height:1.18; margin:.1rem 0 .6rem; font-weight:700}
+  h2{font-size:1.32rem; margin:2.4rem 0 .6rem; padding-top:.6rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.05rem; margin:1.4rem 0 .3rem; color:#33302b}
+  p{margin:.7rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  small,.fine{color:var(--muted); font-size:.82rem}
+  .lede{font-size:1.12rem; color:#33302b}
+  .mission{background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.2rem 0; font-size:.95rem}
+  .mission b{font-variant:small-caps; letter-spacing:.04em}
+  blockquote.insight{background:#fffdf5; border-left:4px solid var(--gold); margin:1.3rem 0; padding:.8rem 1.05rem; border-radius:0 6px 6px 0}
+  blockquote.insight .star{color:var(--gold); font-weight:700}
+  .warn{background:var(--warn-soft); border-left:4px solid var(--warn); padding:.7rem 1rem; border-radius:0 6px 6px 0; margin:1.1rem 0}
+  table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.92rem}
+  th,td{text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  code{font-family:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace; font-size:.86em; background:#f0ece2; padding:.06em .35em; border-radius:4px}
+  pre{background:#1f1d1a; color:#f3efe6; padding:1rem 1.1rem; border-radius:8px; overflow:auto; font-size:.82rem; line-height:1.5}
+  pre code{background:none; padding:0; color:inherit; font-size:inherit}
+  /* Quiz */
+  .quiz{margin:1.2rem 0; border:1px solid var(--rule); border-radius:10px; padding:1rem 1.1rem; background:#fff}
+  .quiz h3{margin-top:.2rem}
+  .q{margin:1rem 0}
+  .q p{font-weight:600; margin:.2rem 0 .5rem}
+  .opt{display:block; width:100%; text-align:left; margin:.32rem 0; padding:.5rem .7rem; border:1px solid var(--rule); border-radius:7px; background:#fcfbf8; cursor:pointer; font:inherit; font-size:.9rem}
+  .opt:hover{border-color:var(--accent)}
+  .opt.correct{background:#e6f4ea; border-color:#3f8f59}
+  .opt.wrong{background:var(--warn-soft); border-color:var(--warn)}
+  .explain{font-size:.85rem; color:var(--muted); margin:.4rem 0 0; display:none}
+  .explain.show{display:block}
+  footer{margin-top:2.6rem; border-top:2px solid var(--rule); padding-top:1rem; font-size:.9rem}
+  .nav{display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.6rem 0}
+  .nav a{text-decoration:none}
+  .ask{background:var(--accent-soft); border-radius:8px; padding:.7rem 1rem; margin:1rem 0; font-size:.92rem}
+  @media print{
+    :root{--paper:#fff}
+    body{font-size:11pt} .quiz .opt{cursor:default} .ask{border:1px solid var(--rule)}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Parte 5 · Avançado · Lição 21</p>
+  <h1>Avaliação: medir o assistente sem framework (LLM-as-judge no Bedrock)</h1>
+  <p class="lede">"Parece bom" não passa numa auditoria bancária. E o Java não tem RAGAS. Esta lição mostra como medir o assistente com honestidade: os <strong>dois eixos</strong> da avaliação, o <strong>juiz LLM construído no Bedrock</strong> e o <strong>gate de regressão em CI</strong>.</p>
+
+  <div class="mission">
+    <b>Por que isto importa para a sua missão —</b> num banco regulado, cada resposta que move dinheiro ou toca dado de cliente precisa ser <em>auditável</em>. Você não pode confiar em "vibes": precisa de um conjunto de testes versionado e de um <strong>gate que falha o build</strong> quando a qualidade regride. E como o ecossistema de avaliação é Python, você vai <strong>construir o avaliador</strong> — com as peças que já tem no Bedrock + LangChain4j.
+  </div>
+
+  <h2>1 · Por que "vibes" não basta</h2>
+  <p>Avaliar não é abrir o chat e achar a resposta boa. É um <strong>conjunto de testes offline</strong> versionado e commitado — como <em>fixtures</em> de teste: triplas <strong>pergunta → resposta-ouro → documentos-ouro esperados</strong>, uma por escopo de conta (nacional/global, por produto). Sem isso, um ajuste de <em>prompt</em> ou uma troca de modelo <strong>regride em silêncio</strong> uma resposta de movimentação ou de KYC — e você só descobre em produção, com o cliente.</p>
+
+  <h2>2 · Os dois eixos (medidos separadamente)</h2>
+  <p>RAG (<a href="0005-rag.html">Lição 5</a>) tem <strong>duas</strong> qualidades independentes. Misturá-las esconde a causa de uma falha:</p>
+  <table>
+    <thead><tr><th>Eixo</th><th>Pergunta</th><th>Métricas</th><th>Como se mede</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Recuperação</strong></td><td>Vieram os <em>chunks</em> certos?</td><td>recall@k, precision@k, <strong>MRR</strong></td><td><strong>Determinístico</strong> — matemática de conjuntos sobre os <em>doc-ids</em> ouro. <strong>Sem LLM.</strong></td></tr>
+      <tr><td><strong>Geração</strong></td><td>A resposta é fiel e relevante?</td><td><em>faithfulness</em>, <em>answer relevancy</em></td><td><strong>LLM-as-judge</strong> — um modelo forte pontua contra uma rubrica.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Fidelidade</strong> (<em>faithfulness</em>/<em>groundedness</em>) = a resposta está <strong>aterrada</strong> nos <em>chunks</em>, sem inventar. <strong>Relevância</strong> = responde à pergunta. As definições são <strong>agnósticas de linguagem</strong> (a referência é o RAGAS) — você as implementa em Java, não as importa.</p>
+
+  <h2>3 · A realidade Java (honesta)</h2>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> <strong>Java não tem camada de avaliação nativa.</strong> O ecossistema Python entrega <em>graders</em> de fábrica (RAGAS, DeepEval, TruLens); na JVM <strong>nenhum</strong> roda <em>in-process</em>. Mas o gap é de <strong>conveniência</strong>, não de capacidade: LLM-as-judge é só um <em>prompt</em> + um modelo forte + uma rubrica — que você já tem via Bedrock. É a mesma honestidade da <a href="0019-ecossistema-honesto.html">Lição 19</a>.</p>
+  </blockquote>
+  <table>
+    <thead><tr><th>Peça</th><th>Realidade em Java</th><th>O que fazer no banco</th></tr></thead>
+    <tbody>
+      <tr><td><strong>eval no langchain4j</strong></td><td><strong>não existe</strong> — o tutorial oficial é um <em>placeholder</em> ("more information coming soon")</td><td>construa LLM-as-judge à mão</td></tr>
+      <tr><td><code>ScoringModel</code></td><td>é <strong>reranker</strong> (relevância doc↔query), <strong>não</strong> avaliador de resposta</td><td>use p/ re-rank (Lição 5), não como <em>grader</em></td></tr>
+      <tr><td><strong>RAGAS / DeepEval / TruLens</strong></td><td><strong>só Python</strong> (zero artefato Maven)</td><td><em>sidecar</em> Python sobre <em>traces</em>, se aceitar poliglota</td></tr>
+      <tr><td><code>langsmith-java</code></td><td>existe, mas <strong>beta</strong> e é cliente de <em>tracing</em>, não <em>eval runner</em></td><td>observabilidade (<a href="0017-observabilidade.html">Lição 17</a>), não avaliação</td></tr>
+      <tr><td><strong>promptfoo</strong></td><td>Node, mas o <em>HTTP provider</em> bate em <strong>qualquer endpoint</strong></td><td>conjunto de eval em CI contra o endpoint Micronaut</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4 · O padrão honesto: LLM-as-judge no Bedrock</h2>
+  <p>Use o <code>AiServices</code> (<a href="0006-arquitetura-langchain4j.html">Lição 6</a>) com o juiz retornando um <strong>record tipado</strong> — nunca <code>Map</code> (a saída por <code>Map</code> é degenerada, <a href="0010-saida-estruturada.html">Lição 10</a>):</p>
+  <pre><code>record Verdict(int faithfulness, int relevancy, String rationale) {}   // 0..5 + justificativa
+
+interface RagJudge {
+    @SystemMessage("You are a strict evaluator of a banking assistant. "
+        + "Score faithfulness (answer fully supported by the context, no invented facts) "
+        + "and relevancy (answer addresses the question) from 0 to 5. Be conservative.")
+    @UserMessage("Question: {{q}}\nContext: {{ctx}}\nAnswer: {{a}}")
+    Verdict judge(@V("q") String question, @V("ctx") String context, @V("a") String answer);
+}
+
+RagJudge judge = AiServices.create(RagJudge.class, judgeModel);   // judgeModel = BedrockChatModel</code></pre>
+  <div class="warn">
+    <strong>Auditabilidade (o que torna o juiz defensável):</strong> <strong>fixe</strong> o juiz num <em>inference profile</em> Claude conhecido, ponha a <strong>temperatura em 0</strong>, <strong>versione a rubrica</strong> e <strong>guarde o <code>rationale</code></strong> de cada nota. Um juiz LLM é <strong>não-determinístico</strong> — então, para gates de conformidade duros, <strong>pareie-o</strong> com as métricas determinísticas de recuperação (recall@k não mente).
+  </div>
+
+  <h2>5 · O gate de CI</h2>
+  <p>Rode o conjunto de eval offline <strong>a cada mudança</strong> (de <em>prompt</em>, modelo, <em>chunking</em>): <strong>falhe o build</strong> se faithfulness ou recall@k caírem abaixo do limiar. O <code>promptfoo</code> pode hospedar o conjunto contra o endpoint Micronaut; o <strong>juiz fica dentro do stack</strong> (Bedrock). Assim, um <em>bump</em> de modelo não regride às escondidas uma resposta que move dinheiro — a regressão vira um <strong>build vermelho</strong>, não um incidente.</p>
+
+  <h2>6 · Pratique (recuperação ativa)</h2>
+  <div class="quiz">
+    <h3>Quiz — recupere de memória, sem reler</h3>
+
+    <div class="q" data-correct="a">
+      <p>1. Por que "vibes" não basta para avaliar num banco regulado?</p>
+      <button class="opt" data-k="a">Porque regressão precisa de gate auditável e versionado</button>
+      <button class="opt" data-k="b">Porque avaliação automática viola a LGPD do cliente</button>
+      <button class="opt" data-k="c">Porque o juiz LLM erra a nota quase sempre</button>
+      <p class="explain">Eval = conjunto offline versionado + gate de CI que falha o build na regressão.</p>
+    </div>
+
+    <div class="q" data-correct="b">
+      <p>2. Para que serve o <code>ScoringModel</code> do langchain4j?</p>
+      <button class="opt" data-k="a">Avaliar a fidelidade da resposta gerada pelo modelo</button>
+      <button class="opt" data-k="b">Re-ranquear documentos recuperados por relevância à query</button>
+      <button class="opt" data-k="c">Pontuar a rubrica de conformidade do banco automaticamente</button>
+      <p class="explain">É reranker (eixo recuperação), não avaliador de resposta. O juiz você constrói.</p>
+    </div>
+
+    <div class="q" data-correct="c">
+      <p>3. Como tornar o juiz LLM auditável num banco?</p>
+      <button class="opt" data-k="a">Aumentar a temperatura para gerar respostas mais variadas</button>
+      <button class="opt" data-k="b">Retornar um <code>Map</code> livre para aceitar qualquer nota</button>
+      <button class="opt" data-k="c">Fixar modelo, temperatura zero e guardar a justificativa</button>
+      <p class="explain">Juiz fixo + temp 0 + rubrica versionada + rationale guardado; pareado com recall@k.</p>
+    </div>
+  </div>
+
+  <h2>7 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/">RAGAS — Available Metrics</a>: as definições agnósticas de <em>faithfulness</em>, <em>answer relevancy</em> e <em>context precision/recall</em> que você implementa em Java. A realidade Java vem do <a href="https://github.com/langchain4j/langchain4j">repositório do langchain4j</a> (o tutorial de <em>testing &amp; evaluation</em>); o caminho cross-stack, do <a href="https://www.promptfoo.dev/docs/providers/http/">promptfoo (HTTP provider)</a>. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+
+  <footer>
+    <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer que eu escreva um conjunto de eval offline de exemplo (triplas pergunta/contexto/resposta-ouro para Pix nacional vs. global) e o <code>RagJudge</code> completo com o gate de CI? É só pedir.</div>
+    <nav class="nav">
+      <span class="fine">Trilha:</span>
+      <a href="0020-agent-skills.html">← 20 · Skills (langchain4j-skills)</a>
+      <a href="index.html">Índice</a>
+      <a href="0022-arquitetura-referencia.html">22 · Arquitetura de referência →</a>
+      <a href="../GLOSSARY.md">Glossário</a>
+    </nav>
+    <p class="fine">Lição 21 · workspace <code>/teach</code> · pt-BR · Foundation First. Rascunho-fonte: <a href="../curso/modulo-19-avaliacao.md">curso/modulo-19</a>.</p>
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.q').forEach(function(q){
+    var correct = q.getAttribute('data-correct');
+    var explain = q.querySelector('.explain');
+    q.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        q.querySelectorAll('.opt').forEach(function(b){ b.classList.remove('correct','wrong'); });
+        if(btn.getAttribute('data-k') === correct){ btn.classList.add('correct'); }
+        else { btn.classList.add('wrong'); q.querySelector('.opt[data-k="'+correct+'"]').classList.add('correct'); }
+        explain.classList.add('show');
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -121,7 +121,26 @@ class TransferService {                          // LLM06 "complete mediation": 
     }
 }</code></pre>
 
-  <h2>6 · Pratique (recuperação ativa)</h2>
+  <h2>6 · Sanitização: a defesa em profundidade (LLM01 + LLM05 + ASVS)</h2>
+  <p>Os controles de §5 são a <strong>fronteira</strong>. A sanitização é a <strong>camada que reduz o impacto</strong> do que atravessa — não a substitui. O OWASP é honesto sobre isso: <em>"não está claro se há métodos infalíveis de prevenção para prompt injection; as medidas a seguir podem mitigar o impacto"</em> (LLM01). No banco, o conteúdo não-confiável chega pela <strong>ingestão de RAG</strong> — PDFs de extrato, campos de memo de transação, corpo de ticket — o vetor <strong>indireto</strong> (LLM01 Cenário #4: <em>"um atacante modifica um documento num repositório usado por uma aplicação RAG; quando a consulta do usuário retorna o conteúdo modificado, as instruções maliciosas alteram a saída do modelo"</em>). Um pipeline em camadas:</p>
+  <table>
+    <thead><tr><th>Camada</th><th>O que faz</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1. Normalizar</strong> (na ingestão)</td><td><code>Normalizer.normalize(s, NFKC)</code>; remova caracteres de controle e <em>zero-width</em>. Frustra evasão por Base64/emoji/multilíngue (LLM01 Cenário #9).</td><td><em>Hardening</em> padrão (não é item numerado do ASVS)</td></tr>
+      <tr><td><strong>2. Segregar</strong> o conteúdo externo</td><td>Marque-o explicitamente como <strong>dado, não instrução</strong>; ponha-o em <em>tool results</em> delimitados e <strong>codifique em JSON</strong> (delimitador inequívoco). Diga ao modelo de onde veio.</td><td>OWASP <strong>LLM01 #6</strong> (<em>"Separate and clearly denote untrusted content"</em>); guia da Anthropic (JSON-encode + <em>tool results</em>)</td></tr>
+      <tr><td><strong>3. Filtrar</strong> (deny-list)</td><td>Defina categorias sensíveis e varra por conteúdo não permitido — filtros semânticos + checagem de string.</td><td>OWASP <strong>LLM01 #3</strong> (<em>"scan for non-allowed content"</em>)</td></tr>
+      <tr><td><strong>4. Validação positiva</strong> (allow-list)</td><td>Valide entradas contra <strong>allow-list</strong> de valores esperados (escopos de conta, <em>enums</em>); dado estruturado fortemente tipado, com limite de tamanho e <em>schema</em>.</td><td>OWASP <strong>ASVS</strong> V4.0.3 — 5.1.3 / 5.1.4 / 5.2.2</td></tr>
+      <tr><td><strong>5. Codificar a saída</strong> (antes de render/exec)</td><td>Codificação <strong>ciente de contexto</strong> da saída do modelo antes de renderizar (HTML/JS/URL) ou usar (SQL <strong>parametrizado</strong>). A saída do modelo é <strong>entrada não-confiável</strong> do próximo sistema.</td><td>OWASP <strong>LLM05</strong> (<em>Improper Output Handling</em>) + <strong>ASVS</strong> 5.3.1</td></tr>
+    </tbody>
+  </table>
+  <blockquote class="insight">
+    <p><span class="star">★ Insight —</span> Repare na <strong>simetria</strong>: você sanitiza a <strong>entrada</strong> que vai ao modelo <strong>e</strong> codifica a <strong>saída</strong> que sai dele. As duas direções tratam o modelo como não-confiável — exatamente o <em>zero-trust</em> do LLM05 (<em>"treat the model as any other user, adopting a zero-trust approach, and apply proper input validation on responses coming from the model"</em>). Mas nenhuma camada é a tranca: a tranca é o <code>ownsAccount</code> / HITL / idempotência de §5. Sanitização é o cinto; a autorização é o freio.</p>
+  </blockquote>
+  <div class="warn">
+    <strong>Honestidade de fundação (caminho Bedrock):</strong> as defesas <em>turnkey</em> da Anthropic — um classificador Haiku para injeção, <em>constrained decoding</em> via <code>output_config</code>, mensagens <code>system</code> mid-conversa — vivem na <strong>API direta</strong>/plataforma da Anthropic, <strong>não</strong> no caminho <strong>Bedrock + langchain4j</strong> do banco. Aqui você <strong>constrói</strong> cada camada à mão (ou via os guardrails de entrada/saída da <a href="0011-guardrails-moderacao.html">Lição 11</a>). E a edição vigente é <strong>2025 (v2.0)</strong>; o ASVS citado é o <strong>V4.0.3</strong>.
+  </div>
+
+  <h2>7 · Pratique (recuperação ativa)</h2>
   <div class="quiz">
     <h3>Quiz — recupere de memória, sem reler</h3>
 
@@ -150,8 +169,8 @@ class TransferService {                          // LLM06 "complete mediation": 
     </div>
   </div>
 
-  <h2>7 · Vá mais fundo</h2>
-  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://genai.owasp.org/llm-top-10/">OWASP — Top 10 for LLM Applications (2025)</a> e os arquivos <code>2_0_vulns/LLM0X_*.md</code> no GitHub do projeto. Os trechos de LLM01/06/08 desta lição são citações verbatim da fonte. Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
+  <h2>8 · Vá mais fundo</h2>
+  <p><strong>Fonte primária recomendada (alta confiança):</strong> <a href="https://genai.owasp.org/llm-top-10/">OWASP — Top 10 for LLM Applications (2025)</a> e os arquivos <code>2_0_vulns/LLM0X_*.md</code> no GitHub do projeto. Os trechos de LLM01/05/06/08 desta lição são citações verbatim da fonte. Para a <strong>validação positiva e a codificação de saída</strong> da §6, a fonte é o <a href="https://github.com/OWASP/ASVS">OWASP ASVS V4.0.3</a> (capítulo V5 — <em>Validation, Sanitization, Encoding</em>). Termos canônicos: ver <a href="../GLOSSARY.md">GLOSSARY.md</a>.</p>
 
   <footer>
     <div class="ask">🎓 <strong>Tire dúvidas com seu professor.</strong> Quer um exercício de red-team (eu escrevo prompts de injeção direta e indireta e você desenha a defesa para cada um), ou o detalhamento de uma entrada específica do OWASP (LLM03/04/10) com mitigações verbatim? É só pedir. <strong>Próxima (Lição 16):</strong> gestão da janela de contexto em profundidade.</div>
