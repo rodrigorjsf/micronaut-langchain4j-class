@@ -92,6 +92,48 @@
     </tbody>
   </table>
 
+  <style>
+  /* Decisão de arquitetura L6 (escopado; não é o primeiro style do documento). */
+  .axconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:axDash 1.1s linear infinite}
+  .axleaf{transition:transform .16s ease;cursor:default}
+  .axleaf:hover{transform:translateY(-2px)}
+  #axPulse{animation:axPulse 2.4s ease-in-out infinite}
+  @keyframes axDash{to{stroke-dashoffset:-26}}
+  @keyframes axPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.axconn,#axPulse{animation:none}}
+  @media print{.axconn,#axPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 290" role="img" aria-labelledby="axtitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="axtitle">A decisão de arquitetura central: AiServices (alto nível) versus ChatModel (baixo nível), com o impacto de cada escolha</title>
+    <defs><filter id="axShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="axleaf"><rect x="230" y="16" width="200" height="36" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#axShadow)"/>
+      <text x="330" y="38" text-anchor="middle" style="fill:var(--accent);font-size:11.5px;font-weight:700">Cablar o LLM no LangChain4j</text></g>
+    <path class="axconn" d="M330 52 L330 70"/><path d="M324 70 L336 70 L330 76 Z" style="fill:var(--accent)"/>
+
+    <polygon id="axPulse" points="330,70 480,120 330,170 180,120" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="330,78 470,120 330,162 190,120" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#axShadow)"/>
+    <text x="330" y="116" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Precisa de controle fino</text>
+    <text x="330" y="132" text-anchor="middle" style="fill:var(--muted);font-size:10px">do loop? (streaming, fluxo manual)</text>
+
+    <text x="232" y="150" style="fill:var(--muted);font-size:10px">não</text>
+    <path class="axconn" d="M250 145 C190 170 175 185 175 208"/><path d="M169 202 L181 202 L175 208 Z" style="fill:var(--accent)"/>
+    <g class="axleaf"><rect x="40" y="210" width="270" height="66" rx="10" style="fill:var(--accent)" filter="url(#axShadow)"/>
+      <text x="56" y="232" style="fill:#fff;font-size:11.5px;font-weight:700">AiServices — alto nível</text>
+      <text x="56" y="249" style="fill:#fff;font-size:9.5px;opacity:.85">o framework roda o loop (Lição 4)</text>
+      <text x="56" y="265" style="fill:#fff;font-size:9.5px;opacity:.8">impacto: a maioria dos casos</text></g>
+
+    <text x="406" y="150" style="fill:var(--muted);font-size:10px">sim</text>
+    <path class="axconn" d="M410 145 C470 170 485 185 485 208"/><path d="M479 202 L491 202 L485 208 Z" style="fill:var(--accent)"/>
+    <g class="axleaf"><rect x="350" y="210" width="270" height="66" rx="10" style="fill:var(--gold)" filter="url(#axShadow)"/>
+      <text x="366" y="232" style="fill:#fff;font-size:11.5px;font-weight:700">ChatModel — baixo nível</text>
+      <text x="366" y="249" style="fill:#fff;font-size:9.5px;opacity:.85">você é o dono do loop</text>
+      <text x="366" y="265" style="fill:#fff;font-size:9.5px;opacity:.8">impacto: controle máximo, mais código</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A decisão central do framework e seu <strong>impacto</strong>: <code>AiServices</code> embrulha o loop da Lição 4 (a maioria dos casos); desça ao <code>ChatModel</code> só quando precisar ser dono do fluxo.</figcaption>
+  </figure>
+
   <blockquote class="insight">
     <p><span class="star">★ Insight —</span> <strong>O <code>AiServices</code> não é "mágica" — é o loop da Lição 4 embrulhado.</strong> Quando você vê <code>String resposta = assistente.conversar(...)</code> retornar já com dados de conta dentro, lembre: por baixo, o framework montou o prompt, enviou as descrições das tools, recebeu os <code>tool_calls</code>, executou seus métodos <code>@Tool</code>, devolveu os resultados ao modelo e repetiu até o texto final — exatamente o fluxo <code>[1]…[8]</code> que rastreamos na Lição 4. A fundação não foi perdida; ela está <strong>escondida atrás da anotação</strong>. Por isso aprendemos o loop manual <em>antes</em>: para nunca tratar o <code>AiServices</code> como caixa-preta.</p>
   </blockquote>

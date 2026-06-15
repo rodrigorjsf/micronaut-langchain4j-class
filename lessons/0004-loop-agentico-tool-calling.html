@@ -92,6 +92,63 @@
                                     ▼
    (6) Volta ao passo (2) com a lista atualizada  ↺  (até o modelo dar texto final)</code></pre>
 
+  <style>
+  /* Diagrama do loop agêntico (escopado; não é o primeiro style do documento). Anima por CSS. */
+  .lpconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:lpDash 1.1s linear infinite}
+  .lpback{stroke:var(--gold);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:lpDashRev 1.3s linear infinite}
+  .lpbox{transition:transform .16s ease;cursor:default}
+  .lpbox:hover{transform:translateY(-2px)}
+  #lpPulse{animation:lpPulse 2.4s ease-in-out infinite}
+  @keyframes lpDash{to{stroke-dashoffset:-26}}
+  @keyframes lpDashRev{to{stroke-dashoffset:26}}
+  @keyframes lpPulse{0%,100%{opacity:.28}50%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.lpconn,.lpback,#lpPulse{animation:none}}
+  @media print{.lpconn,.lpback,#lpPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 420" role="img" aria-labelledby="lptitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="lptitle">O loop agêntico como ciclo: monta o prompt, chama o modelo, decide entre texto final e pedido de tool, seu código valida e executa, e repete</title>
+    <defs><filter id="lpShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="lpbox"><rect x="70" y="16" width="280" height="36" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#lpShadow)"/>
+      <text x="210" y="38" text-anchor="middle" style="fill:var(--accent);font-size:11.5px;font-weight:700">Cliente: "minha fatura e meu saldo?"</text></g>
+    <path class="lpconn" d="M210 52 L210 68"/><path d="M204 68 L216 68 L210 74 Z" style="fill:var(--accent)"/>
+
+    <g class="lpbox"><rect x="70" y="72" width="280" height="46" rx="10" style="fill:var(--accent)" filter="url(#lpShadow)"/>
+      <text x="210" y="92" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">1·2 — Você monta o prompt</text>
+      <text x="210" y="108" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">system + descrições das tools + histórico</text></g>
+    <path class="lpconn" d="M210 118 L210 134"/><path d="M204 134 L216 134 L210 140 Z" style="fill:var(--accent)"/>
+
+    <g class="lpbox"><rect x="70" y="138" width="280" height="36" rx="10" style="fill:var(--accent)" filter="url(#lpShadow)"/>
+      <text x="210" y="160" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">3 — Chama o modelo</text></g>
+    <path class="lpconn" d="M210 174 L210 190"/><path d="M204 190 L216 190 L210 196 Z" style="fill:var(--accent)"/>
+
+    <polygon points="210,194 318,234 210,274 102,234" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#lpShadow)"/>
+    <text x="210" y="238" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Resposta do modelo?</text>
+
+    <text x="326" y="226" style="fill:var(--gold);font-size:10.5px;font-weight:700">texto final</text>
+    <path class="lpconn" d="M318 234 L432 234"/><path d="M432 228 L432 240 L438 234 Z" style="fill:var(--accent)"/>
+    <g class="lpbox"><rect x="438" y="210" width="212" height="48" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2" filter="url(#lpShadow)"/>
+      <text x="452" y="230" style="fill:var(--accent);font-size:11.5px;font-weight:700">Responde ao cliente</text>
+      <text x="452" y="247" style="fill:var(--muted);font-size:10px">ACABOU — fim do loop</text></g>
+
+    <text x="220" y="290" style="fill:var(--muted);font-size:10px">pedido de tool</text>
+    <path class="lpconn" d="M210 274 L210 290"/><path d="M204 290 L216 290 L210 296 Z" style="fill:var(--accent)"/>
+    <rect id="lpPulse" x="66" y="294" width="288" height="56" rx="12" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <g class="lpbox"><rect x="70" y="298" width="280" height="48" rx="10" style="fill:var(--gold)" filter="url(#lpShadow)"/>
+      <text x="210" y="318" text-anchor="middle" style="fill:#fff;font-size:10.5px;font-weight:700">🔒 4 — Seu código valida · autoriza · executa</text>
+      <text x="210" y="334" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: o loop é SEU; o modelo só propõe</text></g>
+    <path class="lpconn" d="M210 346 L210 360"/><path d="M204 360 L216 360 L210 366 Z" style="fill:var(--accent)"/>
+
+    <g class="lpbox"><rect x="70" y="368" width="280" height="34" rx="10" style="fill:var(--accent)" filter="url(#lpShadow)"/>
+      <text x="210" y="389" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">5 — Anexa os resultados às mensagens</text></g>
+
+    <path class="lpback" d="M70 385 C22 385 22 156 70 156"/><path d="M62 150 L62 162 L70 156 Z" style="fill:var(--gold)"/>
+    <text x="34" y="272" style="fill:var(--gold);font-size:15px;font-weight:700" transform="rotate(-90 34 272)">↺ repete</text>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — O loop é <strong>seu</strong>: o passo 5 volta (seta dourada) ao passo 3 até o modelo responder com <strong>texto final</strong> em vez de um <strong>pedido de tool</strong>. O anel pulsa onde mora a defesa: <strong>seu código</strong> valida e autoriza — o modelo apenas propõe.</figcaption>
+  </figure>
+
   <p>O ponto que quase todo iniciante erra: <strong>o "loop" não é do modelo — é seu.</strong> O modelo é uma função sem estado (Lição 1) que você chama repetidamente. <strong>Você</strong> decide quando parar, valida cada passo e controla o que entra na mesa.</p>
 
   <h2>2 · O protocolo de <em>function calling</em>, por baixo do capô</h2>
