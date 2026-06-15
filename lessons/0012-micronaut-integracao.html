@@ -102,6 +102,91 @@
 
   <h2>4 · <code>@AiService</code>, <code>@Tool</code> e a dívida do <code>@P</code> (resolvida)</h2>
   <p><code>@AiService</code> (<code>io.micronaut.langchain4j.annotation</code>): <code>value()</code>/<code>named()</code> escolhem o bean de modelo; <code>tools()</code> lista as classes de tools; <code>customizer()</code> ajusta o builder.</p>
+
+  <style>
+  /* Decisão de fiação em compilação L12 (escopado; NÃO é o primeiro style do documento —
+     o validador captura só o primeiro, então este bloco aplica sem quebrar a byte-identidade).
+     Anima por CSS apenas; sem JavaScript. */
+  .diconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:diDash 1.1s linear infinite}
+  .dileaf{transition:transform .16s ease;cursor:default}
+  .dileaf:hover{transform:translateX(3px)}
+  #diPulse{animation:diPulse 2.4s ease-in-out infinite}
+  @keyframes diDash{to{stroke-dashoffset:-26}}
+  @keyframes diPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.diconn,#diPulse{animation:none}}
+  @media print{.diconn,#diPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 672 488" role="img" aria-labelledby="dititle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="dititle">Decisão de fiação em tempo de compilação: três pegadinhas verificadas que decidem se o @AiService/@Tool realmente fia — com o impacto de cada falha</title>
+    <defs>
+      <filter id="diShadow" x="-8%" y="-12%" width="116%" height="130%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/>
+      </filter>
+    </defs>
+
+    <!-- Start -->
+    <g class="dileaf"><rect x="180" y="14" width="300" height="42" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#diShadow)"/>
+      <text x="330" y="32" text-anchor="middle" style="fill:var(--accent);font-size:12px;font-weight:700">@AiService + @Tool no código</text>
+      <text x="330" y="48" text-anchor="middle" style="fill:var(--muted);font-size:10px">processador de anotação roda no javac</text></g>
+    <path class="diconn" d="M330 56 L330 80"/><path d="M324 78 L336 78 L330 84 Z" style="fill:var(--accent)"/>
+
+    <!-- Decision 1: @Tool em @Singleton? -->
+    <polygon points="330,82 432,122 330,162 228,122" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#diShadow)"/>
+    <text x="330" y="118" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">@Tool em @Singleton?</text>
+    <text x="330" y="134" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">ToolRegistry exige bean</text>
+    <!-- não → fail leaf -->
+    <text x="438" y="112" style="fill:var(--warn);font-size:9px;font-weight:700">não</text>
+    <path class="diconn" d="M432 122 L500 122"/><path d="M500 116 L500 128 L506 122 Z" style="fill:var(--accent)"/>
+
+    <!-- sim continues down -->
+    <text x="338" y="180" style="fill:var(--muted);font-size:9px">sim</text>
+    <path class="diconn" d="M330 162 L330 186"/><path d="M324 184 L336 184 L330 190 Z" style="fill:var(--accent)"/>
+
+    <!-- Decision 2: listado em @AiService(tools)? -->
+    <polygon points="330,188 432,228 330,268 228,228" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#diShadow)"/>
+    <text x="330" y="224" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">listado em</text>
+    <text x="330" y="238" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">@AiService(tools)?</text>
+    <text x="338" y="286" style="fill:var(--muted);font-size:9px">sim</text>
+    <path class="diconn" d="M330 268 L330 292"/><path d="M324 290 L336 290 L330 296 Z" style="fill:var(--accent)"/>
+
+    <!-- Decision 3: build com -parameters? (pulsing — a pegadinha sutil) -->
+    <polygon id="diPulse" points="330,288 437,338 330,388 223,338" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="330,294 431,338 330,382 229,338" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#diShadow)"/>
+    <text x="330" y="334" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">build com</text>
+    <text x="330" y="348" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">-parameters?</text>
+    <text x="240" y="406" text-anchor="end" style="fill:var(--gold);font-size:9px;font-weight:700">sim (Gradle: default)</text>
+    <path class="diconn" d="M330 388 L330 416"/><path d="M324 414 L336 414 L330 420 Z" style="fill:var(--accent)"/>
+
+    <!-- Fail leaf 1: não @Singleton -->
+    <g class="dileaf"><rect x="500" y="96" width="160" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#diShadow)"/>
+      <text x="514" y="118" style="fill:var(--warn);font-size:10px;font-weight:700">NÃO FIA</text>
+      <text x="514" y="133" style="fill:var(--muted);font-size:8.5px">impacto: ToolRegistry</text>
+      <text x="514" y="143" style="fill:var(--muted);font-size:8.5px">ignora; modelo não vê</text></g>
+
+    <!-- Decision 2 não-leaf -->
+    <text x="438" y="218" style="fill:var(--warn);font-size:9px;font-weight:700">não</text>
+    <path class="diconn" d="M432 228 L500 228"/><path d="M500 222 L500 234 L506 228 Z" style="fill:var(--accent)"/>
+    <g class="dileaf"><rect x="500" y="202" width="160" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#diShadow)"/>
+      <text x="514" y="224" style="fill:var(--warn);font-size:10px;font-weight:700">NÃO FIA</text>
+      <text x="514" y="239" style="fill:var(--muted);font-size:8.5px">impacto: getAllTools()</text>
+      <text x="514" y="249" style="fill:var(--muted);font-size:8.5px">não é automático</text></g>
+
+    <!-- Decision 3 não-leaf: Maven puro -->
+    <text x="438" y="328" style="fill:var(--gold);font-size:9px;font-weight:700">não (Maven puro)</text>
+    <path class="diconn" d="M431 338 L500 338"/><path d="M500 332 L500 344 L506 338 Z" style="fill:var(--accent)"/>
+    <g class="dileaf"><rect x="500" y="312" width="160" height="52" rx="10" style="fill:var(--gold)" filter="url(#diShadow)"/>
+      <text x="514" y="332" style="fill:#fff;font-size:10px;font-weight:700">arg0/arg1</text>
+      <text x="514" y="347" style="fill:#fff;font-size:8.5px;opacity:.85">impacto: confunde o</text>
+      <text x="514" y="357" style="fill:#fff;font-size:8.5px;opacity:.85">modelo → @P(name=...)</text></g>
+
+    <!-- Success leaf -->
+    <g class="dileaf"><rect x="120" y="424" width="420" height="52" rx="10" style="fill:var(--accent)" filter="url(#diShadow)"/>
+      <text x="135" y="448" style="fill:#fff;font-size:11px;font-weight:700">FIA EM COMPILAÇÃO — sem reflexão em runtime</text>
+      <text x="135" y="464" style="fill:#fff;font-size:9px;opacity:.85">impacto: startup rápido; amigável a GraalVM (imagem nativa)</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A decisão: <strong>o seu <code>@AiService</code>/<code>@Tool</code> vai mesmo fiar em compilação?</strong> Três pegadinhas verificadas (§4) e o <strong>impacto</strong> de cada falha; o caminho feliz é o ganho do DI de compilação: <strong>sem reflexão em runtime → startup rápido, amigável a GraalVM</strong>. (Independente da versão — vale tanto na 1.15.1 que o 2.0.1 resolve quanto na 1.16.2 sobrescrita.)</figcaption>
+  </figure>
   <div class="warn">
     <strong>Tools só são fiadas se listadas em <code>@AiService(tools={...})</code></strong> — <code>getAllTools()</code> <strong>não</strong> é aplicado automaticamente, e os métodos <code>@Tool</code> <strong>precisam estar em beans <code>@Singleton</code></strong>. Esquecer um dos dois = o modelo nunca enxerga a tool.
   </div>

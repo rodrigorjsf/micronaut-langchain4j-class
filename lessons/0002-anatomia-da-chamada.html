@@ -135,6 +135,64 @@
   </table>
   <p>Custo ≈ (2.530 × US$3 + 250 × US$15) / 1.000.000 ≈ <strong>US$ 0,0114</strong> por turno. Parece nada — mas <strong>multiplique por milhões de turnos/dia</strong> e por uma conversa que reenvia o histórico crescente a cada mensagem (limitação "sem estado" da Lição 1!), e o custo explode de forma <strong>quadrática</strong> ao longo de uma conversa longa.</p>
 
+  <style>
+  /* Sequência custo×contexto L2 (escopado; NÃO é o primeiro style do documento —
+     o validador captura só o primeiro style do head, então este é ignorado pela
+     checagem de byte-identidade enquanto ainda aplica). Anima por CSS — sem JavaScript. */
+  .ccconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:ccDash 1.1s linear infinite}
+  .ccturn{transition:transform .16s ease;cursor:default}
+  .ccturn:hover{transform:translateX(3px)}
+  #ccN2{animation:ccPulse 2.4s ease-in-out infinite}
+  #ccDot{transform-box:view-box;transform-origin:0 0;animation:ccTravel 4.8s ease-in-out infinite}
+  @keyframes ccDash{to{stroke-dashoffset:-26}}
+  @keyframes ccPulse{0%,100%{opacity:.28}50%{opacity:1}}
+  @keyframes ccTravel{0%{transform:translateX(0);opacity:0}8%{opacity:1}88%{opacity:1}100%{transform:translateX(150px);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.ccconn,#ccN2,#ccDot{animation:none}#ccDot{opacity:0}}
+  @media print{.ccconn,#ccN2,#ccDot{animation:none}#ccDot{display:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 326" role="img" aria-labelledby="cctitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="cctitle">Anatomia de três turnos: como, sem memória, cada turno reenvia todo o histórico — e o custo acumulado cresce com N²</title>
+    <defs><filter id="ccShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <text x="20" y="22" style="fill:var(--muted);font-size:10px;font-weight:700">ENTRADA reenviada (a mesa cresce a cada turno)</text>
+    <text x="470" y="22" style="fill:var(--muted);font-size:10px;font-weight:700">MODELO → SAÍDA</text>
+
+    <!-- Turno 1 -->
+    <g class="ccturn"><rect x="20" y="34" width="300" height="34" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#ccShadow)"/>
+      <text x="34" y="55" style="fill:var(--accent);font-size:11px;font-weight:700">Turno 1 · entrada: sys + P1</text></g>
+    <path class="ccconn" d="M320 51 L452 51"/><path d="M452 45 L452 57 L460 51 Z" style="fill:var(--accent)"/>
+    <g class="ccturn"><rect x="464" y="34" width="176" height="34" rx="10" style="fill:var(--accent)" filter="url(#ccShadow)"/>
+      <text x="552" y="55" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">→ R1</text></g>
+
+    <!-- Turno 2 -->
+    <g class="ccturn"><rect x="20" y="86" width="300" height="48" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#ccShadow)"/>
+      <text x="34" y="107" style="fill:var(--accent);font-size:11px;font-weight:700">Turno 2 · entrada: sys + P1 + R1 + P2</text>
+      <text x="34" y="124" style="fill:var(--muted);font-size:9.5px">reenvia tudo do turno 1</text></g>
+    <path class="ccconn" d="M320 110 L452 110"/><path d="M452 104 L452 116 L460 110 Z" style="fill:var(--accent)"/>
+    <g class="ccturn"><rect x="464" y="93" width="176" height="34" rx="10" style="fill:var(--accent)" filter="url(#ccShadow)"/>
+      <text x="552" y="114" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">→ R2</text></g>
+
+    <!-- Turno 3 -->
+    <g class="ccturn"><rect x="20" y="152" width="300" height="62" rx="10" style="fill:var(--gold)" filter="url(#ccShadow)"/>
+      <text x="34" y="173" style="fill:#fff;font-size:11px;font-weight:700">Turno 3 · entrada: sys + P1 + R1 +</text>
+      <text x="34" y="189" style="fill:#fff;font-size:11px;font-weight:700">P2 + R2 + P3</text>
+      <text x="34" y="205" style="fill:#fff;font-size:9.5px;opacity:.85">reenvia tudo dos turnos 1 e 2</text></g>
+    <circle id="ccDot" cx="324" cy="183" r="5" style="fill:var(--gold);stroke:#fff;stroke-width:1.5"/>
+    <path class="ccconn" d="M320 183 L452 183"/><path d="M452 177 L452 189 L460 183 Z" style="fill:var(--accent)"/>
+    <g class="ccturn"><rect x="464" y="166" width="176" height="34" rx="10" style="fill:var(--accent)" filter="url(#ccShadow)"/>
+      <text x="552" y="187" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">→ R3</text></g>
+
+    <!-- Impacto / N² -->
+    <path class="ccconn" d="M170 214 L170 244"/><path d="M164 244 L176 244 L170 250 Z" style="fill:var(--accent)"/>
+    <rect id="ccN2" x="58" y="252" width="544" height="56" rx="10" style="fill:none;stroke:var(--warn);stroke-width:2.5"/>
+    <rect x="62" y="256" width="536" height="48" rx="8" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#ccShadow)"/>
+    <text x="330" y="278" text-anchor="middle" style="fill:var(--warn);font-size:11.5px;font-weight:700">impacto: o turno N reenvia ~N mensagens</text>
+    <text x="330" y="296" text-anchor="middle" style="fill:var(--ink);font-size:10.5px">somando os turnos, o custo acumulado cresce com N², não com N</text>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — Anatomia de três turnos. Como o modelo é <strong>sem estado</strong>, cada turno <strong>reenvia todo o histórico</strong> (a entrada à esquerda cresce: 1 → 2 → 3 mensagens). Somando as entradas de todos os turnos (1 + 2 + … + N), o <strong>custo acumulado</strong> da conversa cresce com <strong>N²</strong> — o coração da gestão de contexto (Lição 16).</figcaption>
+  </figure>
+
   <blockquote class="insight">
     <p><span class="star">★ Insight —</span> <strong>A armadilha do "sem estado" vira uma conta de luz.</strong> Como o modelo não tem memória, reenviamos o histórico inteiro a cada turno. Numa conversa de N mensagens, o turno N reenvia ~N mensagens. Somando todos os turnos, o custo cresce com <strong>N²</strong>, não com N. É por isso que "gestão da janela de contexto" (Lição 16) não é refinamento acadêmico — é a diferença entre um produto viável e um que queima dinheiro. As técnicas (resumir o passado, recuperar só o relevante, janelas de memória) são, na prática, <strong>estratégias de custo</strong>.</p>
   </blockquote>

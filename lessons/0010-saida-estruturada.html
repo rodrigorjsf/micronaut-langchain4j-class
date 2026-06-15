@@ -103,6 +103,58 @@
   </table>
   <p><code>supportsJsonSchema()</code> = <code>chatModel.supportedCapabilities().contains(RESPONSE_FORMAT_JSON_SCHEMA)</code>. O <code>ResponseFormatType</code> tem <strong>só</strong> <code>TEXT</code> e <code>JSON</code> — "schema nativo" é <code>type(JSON)</code> <strong>+</strong> um <code>JsonSchema</code> não-nulo.</p>
 
+  <style>
+  /* Decisão de saída estruturada L10 (escopado; NÃO é o primeiro style do documento —
+     o validador captura só o primeiro, então o design system do head fica intacto).
+     Anima por CSS apenas; sem JavaScript. */
+  .seconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:seDash 1.1s linear infinite}
+  .seleaf{transition:transform .16s ease;cursor:default}
+  .seleaf:hover{transform:translateX(3px)}
+  #sePulse{animation:sePulse 2.4s ease-in-out infinite}
+  @keyframes seDash{to{stroke-dashoffset:-26}}
+  @keyframes sePulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.seconn,#sePulse{animation:none}}
+  @media print{.seconn,#sePulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 360" role="img" aria-labelledby="setitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="setitle">Decisão de saída estruturada: o DefaultAiServices escolhe entre JSON schema nativo (capability opt-in no Bedrock) e fallback por prompt — e ambos os caminhos convergem para "tipado não é confiável"</title>
+    <defs><filter id="seShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="seleaf"><rect x="200" y="14" width="260" height="34" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#seShadow)"/>
+      <text x="330" y="36" text-anchor="middle" style="fill:var(--accent);font-size:11px;font-weight:700">AiService devolve o tipo de retorno T</text></g>
+    <path class="seconn" d="M330 48 L330 76"/><path d="M324 76 L336 76 L330 82 Z" style="fill:var(--accent)"/>
+
+    <polygon id="sePulse" points="330,76 451,128 330,180 209,128" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="330,82 445,128 330,174 215,128" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#seShadow)"/>
+    <text x="330" y="124" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">Capability JSON schema</text>
+    <text x="330" y="139" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">anunciada?</text>
+
+    <text x="120" y="98" text-anchor="middle" style="fill:var(--warn);font-size:9.5px;font-weight:700">não — default no Bedrock</text>
+    <path class="seconn" d="M215 128 C150 128 120 128 120 150"/><path d="M114 150 L126 150 L120 156 Z" style="fill:var(--warn)"/>
+    <g class="seleaf"><rect x="14" y="156" width="232" height="56" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#seShadow)"/>
+      <text x="30" y="180" style="fill:var(--warn);font-size:11px;font-weight:700">(B) JSON por prompt</text>
+      <text x="30" y="196" style="fill:var(--muted);font-size:9px">impacto: silencioso · zero garantia;</text>
+      <text x="30" y="207" style="fill:var(--muted);font-size:9px">só anexa instrução textual</text></g>
+
+    <text x="540" y="98" text-anchor="middle" style="fill:var(--gold);font-size:9.5px;font-weight:700">sim — opt-in explícito</text>
+    <path class="seconn" d="M445 128 C510 128 540 128 540 150"/><path d="M534 150 L546 150 L540 156 Z" style="fill:var(--gold)"/>
+    <g class="seleaf"><rect x="414" y="156" width="232" height="56" rx="10" style="fill:var(--gold)" filter="url(#seShadow)"/>
+      <text x="430" y="180" style="fill:#fff;font-size:11px;font-weight:700">(A) JSON schema nativo</text>
+      <text x="430" y="196" style="fill:#fff;font-size:9px;opacity:.85">impacto: ResponseFormat.type(JSON)</text>
+      <text x="430" y="207" style="fill:#fff;font-size:9px;opacity:.85">restringe a geração (ainda probabilístico)</text></g>
+
+    <path class="seconn" d="M120 212 C120 252 270 250 320 264"/><path d="M315 258 L325 268 L314 270 Z" style="fill:var(--accent)"/>
+    <path class="seconn" d="M540 212 C540 252 390 250 340 264"/><path d="M346 258 L335 268 L346 270 Z" style="fill:var(--accent)"/>
+
+    <g class="seleaf"><rect x="160" y="270" width="340" height="66" rx="10" style="fill:var(--accent)" filter="url(#seShadow)"/>
+      <text x="330" y="296" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">tipado ≠ confiável</text>
+      <text x="330" y="314" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: schema garante a FORMA, não a VERDADE</text>
+      <text x="330" y="327" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">valide as regras e autorize no SEU código (Lição 11)</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A decisão única do <code>DefaultAiServices</code> e o <strong>impacto</strong> de cada ramo: sem o opt-in da capability, o Bedrock cai <strong>em silêncio</strong> no <strong>(B) JSON por prompt</strong> (zero garantia); com <code>RESPONSE_FORMAT_JSON_SCHEMA</code>, segue o <strong>(A) schema nativo</strong> (restringe a geração, mas ainda é probabilístico). Os <strong>dois</strong> ramos convergem para a mesma verdade: <strong>tipado ≠ confiável</strong> — validar e autorizar continua sendo seu (§6, Lição 11).</figcaption>
+  </figure>
+
   <h2>4 · Bedrock: o opt-in obrigatório (e o fallback silencioso)</h2>
   <blockquote class="insight">
     <p><span class="star">★ Insight —</span> <strong>O gêmeo do <code>cacheSystemMessages</code> da Lição 8.</strong> Por padrão, o <code>BedrockChatModel</code> <strong>não anuncia</strong> a capability <code>RESPONSE_FORMAT_JSON_SCHEMA</code> (<code>copy(null) = Set.of()</code>). Resultado: o <code>AiServices</code> <strong>cai no fallback por prompt em silêncio</strong> — sem warning, sem exceção. Você acha que tem schema forçado; tem só uma "sugestão" de formato. De novo: <em>compila e não faz o que você acha</em> — só a fonte primária pega.</p>

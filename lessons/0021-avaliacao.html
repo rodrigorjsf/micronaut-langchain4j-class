@@ -83,6 +83,74 @@
       <tr><td><strong>Geração</strong></td><td>A resposta é fiel e relevante?</td><td><em>faithfulness</em>, <em>answer relevancy</em></td><td><strong>LLM-as-judge</strong> — um modelo forte pontua contra uma rubrica.</td></tr>
     </tbody>
   </table>
+  <style>
+  /* Avaliação L21: split dos dois eixos → gate de CI (escopado; não é o primeiro style do documento). Anima por CSS. */
+  .avconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:avDash 1.1s linear infinite}
+  .avleaf{transition:transform .16s ease;cursor:default}
+  .avleaf:hover{transform:translateY(-2px)}
+  #avPulse{animation:avPulse 2.4s ease-in-out infinite}
+  @keyframes avDash{to{stroke-dashoffset:-26}}
+  @keyframes avPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.avconn,#avPulse{animation:none}}
+  @media print{.avconn,#avPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 446" role="img" aria-labelledby="avtitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="avtitle">Os dois eixos da avaliação (recuperação determinística e geração por LLM-as-judge) convergem num gate de CI que falha o build na regressão</title>
+    <defs>
+      <filter id="avShadow" x="-8%" y="-12%" width="116%" height="130%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/>
+      </filter>
+    </defs>
+
+    <!-- Start: mudança dispara a eval -->
+    <g class="avleaf"><rect x="200" y="14" width="260" height="44" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#avShadow)"/>
+      <text x="330" y="33" text-anchor="middle" style="fill:var(--accent);font-size:11.5px;font-weight:700">Mudança: prompt · modelo · chunking</text>
+      <text x="330" y="49" text-anchor="middle" style="fill:var(--muted);font-size:10px">roda o conjunto de eval offline</text></g>
+
+    <!-- Fork (sem losango): dois eixos medidos separadamente -->
+    <path class="avconn" d="M330 58 L330 72 L150 72 L150 92"/><path d="M144 92 L156 92 L150 98 Z" style="fill:var(--accent)"/>
+    <path class="avconn" d="M330 58 L330 72 L510 72 L510 92"/><path d="M504 92 L516 92 L510 98 Z" style="fill:var(--accent)"/>
+
+    <!-- Eixo 1: Recuperação (determinístico) -->
+    <g class="avleaf"><rect x="22" y="100" width="256" height="62" rx="10" style="fill:var(--accent)" filter="url(#avShadow)"/>
+      <text x="40" y="123" style="fill:#fff;font-size:11.5px;font-weight:700">Recuperação — determinístico</text>
+      <text x="40" y="139" style="fill:#fff;font-size:9.5px;opacity:.85">recall@k · precision@k · MRR · sem LLM</text>
+      <text x="40" y="154" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: barato e repetível — não mente</text></g>
+
+    <!-- Eixo 2: Geração (LLM-as-judge) = nó-trabalho do juiz -->
+    <g class="avleaf"><rect x="382" y="100" width="256" height="62" rx="10" style="fill:var(--gold)" filter="url(#avShadow)"/>
+      <text x="400" y="123" style="fill:#fff;font-size:11.5px;font-weight:700">Geração — LLM-as-judge</text>
+      <text x="400" y="139" style="fill:#fff;font-size:9.5px;opacity:.85">faithfulness · relevancy (rubrica)</text>
+      <text x="400" y="154" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: não-determinístico → fixe modelo + temp 0</text></g>
+
+    <!-- Convergência dos dois eixos no gate -->
+    <path class="avconn" d="M150 162 L150 188 L300 188 L300 206"/><path d="M294 206 L306 206 L300 212 Z" style="fill:var(--accent)"/>
+    <path class="avconn" d="M510 162 L510 188 L360 188 L360 206"/><path d="M354 206 L366 206 L360 212 Z" style="fill:var(--accent)"/>
+
+    <!-- Gate de CI: o único losango (com anel pulsante) -->
+    <polygon id="avPulse" points="330,206 452,266 330,326 208,266" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="330,212 446,266 330,320 214,266" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#avShadow)"/>
+    <text x="330" y="262" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Gate de CI</text>
+    <text x="330" y="278" text-anchor="middle" style="fill:var(--ink);font-size:10px">faithfulness ou recall@k &lt; limiar?</text>
+
+    <!-- Folha: falha o build -->
+    <text x="118" y="350" style="fill:var(--warn);font-size:10px;font-weight:700">sim</text>
+    <path class="avconn" d="M214 266 C150 266 138 352 110 352 L72 352 L72 372"/><path d="M66 372 L78 372 L72 378 Z" style="fill:var(--accent)"/>
+    <g class="avleaf"><rect x="22" y="380" width="280" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#avShadow)"/>
+      <text x="40" y="406" style="fill:var(--warn);font-size:11.5px;font-weight:700">Falha o build (vermelho)</text>
+      <text x="40" y="422" style="fill:var(--muted);font-size:9.5px">impacto: regressão barrada antes de produção</text></g>
+
+    <!-- Folha: merge liberado -->
+    <text x="528" y="350" style="fill:var(--accent);font-size:10px;font-weight:700">não</text>
+    <path class="avconn" d="M446 266 C510 266 522 352 550 352 L588 352 L588 372"/><path d="M582 372 L594 372 L588 378 Z" style="fill:var(--accent)"/>
+    <g class="avleaf"><rect x="358" y="380" width="280" height="52" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2" filter="url(#avShadow)"/>
+      <text x="376" y="406" style="fill:var(--accent);font-size:11.5px;font-weight:700">Merge liberado</text>
+      <text x="376" y="422" style="fill:var(--muted);font-size:9.5px">impacto: qualidade auditável mantida</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — Os <strong>dois eixos</strong> rodam <strong>sempre</strong> (não é um "ou"): <strong>recuperação</strong> determinística (<code>recall@k</code>, sem LLM) e <strong>geração</strong> por <em>LLM-as-judge</em>. Ambos convergem no <strong>único</strong> ponto de decisão — o <strong>gate de CI</strong>: se <code>faithfulness</code> <strong>ou</strong> <code>recall@k</code> cai abaixo do limiar, o <strong>impacto</strong> é <strong>build vermelho</strong> (regressão barrada antes de produção); caso contrário, o merge é liberado.</figcaption>
+  </figure>
+
   <p><strong>Fidelidade</strong> (<em>faithfulness</em>/<em>groundedness</em>) = a resposta está <strong>aterrada</strong> nos <em>chunks</em>, sem inventar. <strong>Relevância</strong> = responde à pergunta. As definições são <strong>agnósticas de linguagem</strong> (a referência é o RAGAS) — você as implementa em Java, não as importa.</p>
 
   <h2>3 · A realidade Java (honesta)</h2>

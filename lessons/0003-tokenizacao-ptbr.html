@@ -143,6 +143,65 @@
   </blockquote>
 
   <h2>6 · Estratégias de mitigação (acionáveis)</h2>
+
+  <style>
+  /* Decisão de mitigação do "imposto do português" L3 (escopado; NÃO é o primeiro style do documento,
+     então o validador — que captura só o primeiro — preserva o design system byte-idêntico do head).
+     Anima por CSS — nenhum JavaScript envolvido. */
+  .tkconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:tkDash 1.1s linear infinite}
+  .tkleaf{transition:transform .16s ease;cursor:default}
+  .tkleaf:hover{transform:translateX(3px)}
+  #tkPulse{animation:tkPulse 2.4s ease-in-out infinite}
+  @keyframes tkDash{to{stroke-dashoffset:-26}}
+  @keyframes tkPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.tkconn,#tkPulse{animation:none}}
+  @media print{.tkconn,#tkPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 372" role="img" aria-labelledby="tktitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="tktitle">Decisão de mitigação: pelo papel de cada texto pt-BR, escolha a alavanca e veja seu impacto no custo de tokens</title>
+    <defs><filter id="tkShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="tkleaf"><rect x="190" y="12" width="280" height="40" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#tkShadow)"/>
+      <text x="330" y="30" text-anchor="middle" style="fill:var(--accent);font-size:11px;font-weight:700">Texto pt-BR indo ao modelo</text>
+      <text x="330" y="44" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">infla ~1,27–1,47× vs. inglês</text></g>
+    <path class="tkconn" d="M330 52 L330 78"/><path d="M324 78 L336 78 L330 84 Z" style="fill:var(--accent)"/>
+
+    <polygon id="tkPulse" points="330,80 446,128 330,176 214,128" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="330,86 440,128 330,170 220,128" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#tkShadow)"/>
+    <text x="330" y="125" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Que papel tem</text>
+    <text x="330" y="139" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">o texto?</text>
+
+    <text x="120" y="78" text-anchor="middle" style="fill:var(--gold);font-size:9px;font-weight:700">overhead fixo</text>
+    <path class="tkconn" d="M220 128 C150 128 140 116 96 116"/><path d="M96 110 L96 122 L90 116 Z" style="fill:var(--accent)"/>
+    <g class="tkleaf"><rect x="14" y="92" width="300" height="56" rx="10" style="fill:var(--gold)" filter="url(#tkShadow)"/>
+      <text x="30" y="114" style="fill:#fff;font-size:10.5px;font-weight:700">Escreva o overhead em inglês</text>
+      <text x="30" y="128" style="fill:#fff;font-size:9px;opacity:.85">system prompt · descrições de tools · nomes de campos</text>
+      <text x="30" y="142" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: ~19–23% menor, e vai em TODA chamada</text></g>
+
+    <text x="540" y="104" text-anchor="middle" style="fill:var(--warn);font-size:9px;font-weight:700">resposta ao cliente</text>
+    <path class="tkconn" d="M440 128 C510 128 520 140 564 140"/><path d="M564 134 L564 146 L570 140 Z" style="fill:var(--accent)"/>
+    <g class="tkleaf"><rect x="346" y="116" width="314" height="56" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#tkShadow)"/>
+      <text x="362" y="138" style="fill:var(--warn);font-size:10.5px;font-weight:700">pt-BR obrigatório → contenha a verbosidade</text>
+      <text x="362" y="152" style="fill:var(--muted);font-size:9px">max_tokens · estilo conciso (sem sacrificar clareza)</text>
+      <text x="362" y="166" style="fill:var(--muted);font-size:9.5px">impacto: incide na saída (ex. ~5×) + histórico N²</text></g>
+
+    <text x="330" y="196" text-anchor="middle" style="fill:var(--accent);font-size:9px;font-weight:700">escolha de modelo</text>
+    <path class="tkconn" d="M330 170 L330 210"/><path d="M324 210 L336 210 L330 216 Z" style="fill:var(--accent)"/>
+    <g class="tkleaf"><rect x="180" y="216" width="300" height="56" rx="10" style="fill:var(--accent)" filter="url(#tkShadow)"/>
+      <text x="196" y="238" style="fill:#fff;font-size:10.5px;font-weight:700">Tokenizador moderno (cl100k → o200k)</text>
+      <text x="196" y="252" style="fill:#fff;font-size:9px;opacity:.85">vocabulário maior e mais multilíngue fragmenta menos</text>
+      <text x="196" y="266" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: ~15% grátis, sem mudar uma linha do texto</text></g>
+    <path class="tkconn" d="M330 272 L330 300"/><path d="M324 300 L336 300 L330 306 Z" style="fill:var(--accent)"/>
+
+    <g class="tkleaf"><rect x="120" y="306" width="420" height="58" rx="10" style="fill:var(--rule)" filter="url(#tkShadow)"/>
+      <text x="330" y="328" text-anchor="middle" style="fill:var(--ink);font-size:10.5px;font-weight:700">Precisa do número EXATO para o Claude?</text>
+      <text x="330" y="342" text-anchor="middle" style="fill:var(--muted);font-size:9px">Claude não tem tokenizador offline oficial</text>
+      <text x="330" y="356" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">impacto: use a CountTokens da Bedrock — única contagem confiável</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — Pelo <strong>papel</strong> de cada texto, a alavanca e seu <strong>impacto</strong>: o <em>overhead</em> fixo em inglês (vai em toda chamada); a resposta em pt-BR onde só dá para <strong>conter a verbosidade</strong> (saída mais cara + histórico N²); a troca de tokenizador (<code>cl100k→o200k</code>, ~15% grátis); e, para o número exato no Claude, a <strong>CountTokens da Bedrock</strong> — não há tokenizador offline.</figcaption>
+  </figure>
+
   <table>
     <thead><tr><th>Estratégia</th><th>Por que funciona</th><th>Quanto economiza</th><th>Ressalva</th></tr></thead>
     <tbody>

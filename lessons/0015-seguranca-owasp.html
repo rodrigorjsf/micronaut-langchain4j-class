@@ -100,6 +100,75 @@
   </table>
   <p>A relação <strong>mecanismo → entrada é muitos-para-muitos</strong>: um mecanismo cobre várias entradas (authz server-side → LLM06 <strong>e</strong> LLM02) e uma entrada precisa de vários mecanismos. É <strong>defesa em profundidade</strong>, não 1:1.</p>
 
+  <style>
+  /* Decisão de injeção de prompt L15 (escopado; NÃO é o primeiro style do documento —
+     o validador captura só o primeiro, então o design system do head fica intacto).
+     Anima por CSS; sem JavaScript. Prefixo 'pi' = prompt injection. */
+  .piconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:piDash 1.1s linear infinite}
+  .pileaf{transition:transform .16s ease;cursor:default}
+  .pileaf:hover{transform:translateX(3px)}
+  #piPulse{animation:piPulse 2.4s ease-in-out infinite}
+  @keyframes piDash{to{stroke-dashoffset:-26}}
+  @keyframes piPulse{0%,100%{opacity:.25}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.piconn,#piPulse{animation:none}}
+  @media print{.piconn,#piPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 510" role="img" aria-labelledby="pititle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="pititle">Decisão da injeção de prompt: direta (na mensagem do usuário) vs. indireta (escondida em doc de RAG ou tool result) — e a defesa única, que vive no código e nunca no prompt</title>
+    <defs>
+      <filter id="piShadow" x="-8%" y="-12%" width="116%" height="130%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/>
+      </filter>
+    </defs>
+
+    <g class="pileaf"><rect x="200" y="14" width="260" height="40" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#piShadow)"/>
+      <text x="330" y="32" text-anchor="middle" style="fill:var(--accent);font-size:12px;font-weight:700">Entrada não-confiável chega ao modelo</text>
+      <text x="330" y="47" text-anchor="middle" style="fill:var(--muted);font-size:10px">LLM01 · Prompt Injection (#1)</text></g>
+    <path class="piconn" d="M330 54 L330 78"/><path d="M324 78 L336 78 L330 84 Z" style="fill:var(--accent)"/>
+
+    <polygon points="330,84 432,134 330,184 228,134" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#piShadow)"/>
+    <text x="330" y="131" text-anchor="middle" style="fill:var(--ink);font-size:12px;font-weight:700">Injeção:</text>
+    <text x="330" y="147" text-anchor="middle" style="fill:var(--ink);font-size:12px;font-weight:700">de onde vem?</text>
+
+    <text x="150" y="120" style="fill:var(--warn);font-size:10.5px;font-weight:700">direta</text>
+    <path class="piconn" d="M228 134 C160 134 120 96 96 96"/><path d="M102 90 L90 96 L102 102 Z" style="fill:var(--accent)"/>
+    <g class="pileaf"><rect x="14" y="70" width="190" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#piShadow)"/>
+      <text x="30" y="92" style="fill:var(--warn);font-size:10.5px;font-weight:700">Mensagem do usuário</text>
+      <text x="30" y="108" style="fill:var(--muted);font-size:9px">impacto: jailbreak digitado no chat</text></g>
+
+    <text x="478" y="120" style="fill:var(--warn);font-size:10.5px;font-weight:700">indireta</text>
+    <path class="piconn" d="M432 134 C500 134 540 96 564 96"/><path d="M558 90 L570 96 L558 102 Z" style="fill:var(--accent)"/>
+    <g class="pileaf"><rect x="456" y="70" width="190" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#piShadow)"/>
+      <text x="472" y="92" style="fill:var(--warn);font-size:10.5px;font-weight:700">Doc de RAG / tool result</text>
+      <text x="472" y="108" style="fill:var(--muted);font-size:9px">impacto: escondida no dado; invisível</text></g>
+
+    <path class="piconn" d="M96 122 L96 210 L318 210"/><path class="piconn" d="M564 122 L564 210 L342 210"/>
+    <path class="piconn" d="M330 184 L330 224"/><path d="M324 224 L336 224 L330 230 Z" style="fill:var(--accent)"/>
+
+    <rect id="piPulse" x="184" y="228" width="292" height="64" rx="13" style="fill:none;stroke:var(--gold);stroke-width:2"/>
+    <rect x="190" y="234" width="280" height="52" rx="11" style="fill:var(--gold)" filter="url(#piShadow)"/>
+    <text x="330" y="258" text-anchor="middle" style="fill:#fff;font-size:12.5px;font-weight:700">Controle no código, nunca no prompt</text>
+    <text x="330" y="276" text-anchor="middle" style="fill:#fff;font-size:9.5px;opacity:.85">a mesma defesa para as duas origens — §4</text>
+    <path class="piconn" d="M330 286 L330 312"/><path d="M324 312 L336 312 L330 318 Z" style="fill:var(--accent)"/>
+
+    <g class="pileaf"><rect x="190" y="318" width="280" height="50" rx="10" style="fill:var(--accent)" filter="url(#piShadow)"/>
+      <text x="206" y="340" style="fill:#fff;font-size:11px;font-weight:700">authz server-side · LLM02</text>
+      <text x="206" y="356" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: barra vazamento cross-tenant</text></g>
+    <path class="piconn" d="M330 368 L330 378"/><path d="M324 378 L336 378 L330 384 Z" style="fill:var(--accent)"/>
+
+    <g class="pileaf"><rect x="190" y="384" width="280" height="50" rx="10" style="fill:var(--accent)" filter="url(#piShadow)"/>
+      <text x="206" y="406" style="fill:#fff;font-size:11px;font-weight:700">saída tipada + encoding · LLM05</text>
+      <text x="206" y="422" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: saída do modelo é não-confiável</text></g>
+    <path class="piconn" d="M330 434 L330 444"/><path d="M324 444 L336 444 L330 450 Z" style="fill:var(--accent)"/>
+
+    <g class="pileaf"><rect x="190" y="450" width="280" height="50" rx="10" style="fill:var(--accent)" filter="url(#piShadow)"/>
+      <text x="206" y="472" style="fill:#fff;font-size:11px;font-weight:700">complete mediation + HITL · LLM06</text>
+      <text x="206" y="488" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: o modelo não autoriza a ação</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A decisão da <strong>origem</strong> da injeção (direta na mensagem vs. indireta no dado de RAG/<em>tool result</em>) <strong>converge</strong> para uma defesa única: o controle vive no <strong>código</strong>, nunca no prompt. As três folhas são controles determinísticos (<code>authz</code> server-side, saída tipada, <em>complete mediation</em> + HITL) que cobrem LLM02/05/06 — o <strong>impacto</strong> de cada um à direita.</figcaption>
+  </figure>
+
   <h2>4 · A linha-mestra: o controle vive no código, nunca no prompt</h2>
   <blockquote class="insight">
     <p><span class="star">★ Insight —</span> <strong>O OWASP diz, com todas as letras, o que esta trilha repete desde a Lição 1.</strong> LLM06 <em>Complete mediation</em> (verbatim): <em>"Implement authorization in downstream systems rather than relying on an LLM to decide if an action is allowed or not."</em> LLM06 <em>Require user approval</em>: human-in-the-loop para ações de alto impacto. LLM07: o system prompt <strong>não</strong> guarda segredo. Conclusão: <strong>autenticação, autorização, confirmação e idempotência são determinísticas e suas</strong>; guardrails e saída tipada <strong>reduzem risco residual</strong>, não substituem o controle. Um system prompt dizendo "só aja na conta do próprio cliente" <strong>não é um controle</strong> — o modelo pode ser persuadido a desobedecer.</p>

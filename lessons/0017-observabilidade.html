@@ -71,6 +71,68 @@
     <b>Por que isto importa para a sua missão —</b> sem traços e métricas, você não sabe o custo de token por cliente, a latência do fan-out nacional+global, nem por que uma chamada falhou. Esta lição instrumenta o assistente — e mostra a armadilha de latência que pode degradar <em>toda</em> chamada que move dinheiro.
   </div>
 
+  <style>
+  /* Pipeline de telemetria L17 (escopado; NÃO é o primeiro style do documento, então
+     o validador — que captura só o primeiro — preserva o design system byte-idêntico).
+     Animação 100% CSS, nenhum JavaScript envolvido. */
+  .obconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:obDash 1.1s linear infinite}
+  #obPulse{animation:obPulse 2.4s ease-in-out infinite}
+  #obDot{transform-box:view-box;transform-origin:0 0;animation:obTravel 5.4s ease-in-out infinite}
+  .obstage{transition:transform .16s ease;cursor:default}
+  .obstage:hover{transform:translateY(-2px)}
+  @keyframes obDash{to{stroke-dashoffset:-26}}
+  @keyframes obPulse{0%,100%{opacity:.3}50%{opacity:1}}
+  @keyframes obTravel{0%{transform:translateY(0);opacity:0}7%{opacity:1}90%{opacity:1}100%{transform:translateY(300px);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.obconn,#obPulse,#obDot{animation:none}#obDot{opacity:0}}
+  @media print{.obconn,#obPulse,#obDot{animation:none}#obDot{display:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 620 384" role="img" aria-labelledby="obtitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="obtitle">Pipeline de telemetria: ChatModelListener síncrono, OpenTelemetry GenAI e LangFuse via OTLP — com o impacto de cada estágio</title>
+    <defs>
+      <filter id="obShadow" x="-8%" y="-12%" width="116%" height="130%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="2.2" flood-color="#1a1a18" flood-opacity="0.16"/>
+      </filter>
+    </defs>
+
+    <g class="obstage">
+      <rect x="60" y="18" width="500" height="48" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#obShadow)"/>
+      <text x="80" y="40" style="fill:var(--accent);font-size:13px;font-weight:700">Chamada do modelo (BedrockChatModel.chat)</text>
+      <text x="80" y="58" style="fill:var(--muted);font-size:11.5px">provider() = AMAZON_BEDROCK; callbacks vêm do template do core</text>
+    </g>
+    <path class="obconn" d="M310 66 L310 86"/>
+    <path d="M304 84 L316 84 L310 90 Z" style="fill:var(--accent)"/>
+
+    <g class="obstage">
+      <rect x="60" y="90" width="500" height="72" rx="10" style="fill:var(--gold)" filter="url(#obShadow)"/>
+      <text x="80" y="114" style="fill:#fff;font-size:13px;font-weight:700">1 · ChatModelListener — o hook (síncrono!)</text>
+      <text x="80" y="133" style="fill:#fff;font-size:12px;opacity:.9">onRequest / onResponse / onError; attributes() carrega span + txn id</text>
+      <text x="80" y="152" style="fill:#fff;font-size:11.5px;opacity:.85">impacto: roda na thread chamadora — exporte FORA dela (BatchSpanProcessor)</text>
+    </g>
+    <rect id="obPulse" x="56" y="86" width="508" height="80" rx="12" style="fill:none;stroke:var(--gold);stroke-width:2"/>
+    <path class="obconn" d="M310 162 L310 182"/>
+    <path d="M304 180 L316 180 L310 186 Z" style="fill:var(--accent)"/>
+
+    <g class="obstage">
+      <rect x="60" y="186" width="500" height="72" rx="10" style="fill:var(--accent)" filter="url(#obShadow)"/>
+      <text x="80" y="210" style="fill:#fff;font-size:13px;font-weight:700">2 · OpenTelemetry GenAI — o padrão (gen_ai.*)</text>
+      <text x="80" y="229" style="fill:#fff;font-size:12px;opacity:.9">span + gen_ai.usage.*; gen_ai.client.operation.duration (Required)</text>
+      <text x="80" y="248" style="fill:#fff;font-size:11.5px;opacity:.85">impacto: gen_ai.provider.name="aws.bedrock"; convenções experimentais → fixe a versão</text>
+    </g>
+    <path class="obconn" d="M310 258 L310 278"/>
+    <path d="M304 276 L316 276 L310 282 Z" style="fill:var(--accent)"/>
+
+    <g class="obstage">
+      <rect x="60" y="282" width="500" height="72" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5" filter="url(#obShadow)"/>
+      <text x="80" y="306" style="fill:var(--accent);font-size:13px;font-weight:700">3 · LangFuse — o destino, via OTLP</text>
+      <text x="80" y="325" style="fill:var(--ink);font-size:12px">exporter OTLP padrão → /api/public/otel (Basic auth)</text>
+      <text x="80" y="344" style="fill:var(--muted);font-size:11.5px">impacto: NÃO há SDK Java — LangFuse é só um backend OpenTelemetry</text>
+    </g>
+
+    <circle id="obDot" cx="310" cy="20" r="5.5" style="fill:var(--gold);stroke:#fff;stroke-width:1.5"/>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A espinha da telemetria, do <strong>hook</strong> ao destino. O nó dourado pulsante é o <code>ChatModelListener</code>: ele roda <strong>síncrono na thread chamadora</strong> — o <strong>impacto</strong> é que um export bloqueante penaliza <em>toda</em> chamada que move dinheiro; por isso exporte fora da thread. Cada estágio traz sua API <strong>e a consequência</strong> (linha <code>impacto:</code>).</figcaption>
+  </figure>
   <h2>1 · O hook: <code>ChatModelListener</code></h2>
   <p>Interface <code>dev.langchain4j.model.chat.listener.ChatModelListener</code> (core) com <strong>três métodos default vazios</strong>: <code>onRequest</code>, <code>onResponse</code>, <code>onError</code> — implemente só o que precisar. O <code>attributes()</code> é um <strong>Map mutável compartilhado</strong> entre <code>onRequest</code>→<code>onResponse</code>/<code>onError</code>: use-o para carregar span, timestamp e o <strong>txn id</strong> da operação bancária.</p>
   <p><strong>Onde dispara:</strong> os callbacks vêm do <strong>template <code>ChatModel.chat()</code> do core</strong> (em volta do <code>doChat</code>), <strong>não</strong> do <code>BedrockChatModel.doChat</code>. O Bedrock herda; <code>provider()</code> = <code>ModelProvider.AMAZON_BEDROCK</code>. Registre via <code>BedrockChatModel.builder().listeners(...)</code>.</p>

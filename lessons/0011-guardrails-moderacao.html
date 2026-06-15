@@ -137,6 +137,91 @@ BedrockChatRequestParameters params = BedrockChatRequestParameters.builder()
     O <code>langchain4j-core</code> tem a SPI (<em>Service Provider Interface</em> / Interface de Provedor de Serviço) <code>ModerationModel</code>, mas as implementações em 1.16.2 são <strong>só OpenAI, Mistral e Watsonx</strong> — <strong>não há <code>ModerationModel</code> para Bedrock/Anthropic</strong>. Logo, neste banco <strong>não existe</strong> <code>moderate()</code>; a moderação <strong>é</strong> o Bedrock Guardrails (in-band ou via <code>ApplyGuardrail</code>).
   </div>
 
+  <style>
+  /* Fluxo de decisão dos guardrails L11 (escopado; NÃO é o primeiro style do
+     documento — o validador captura só o do head, então o design system fica
+     byte-idêntico). Animado por CSS, nenhum JavaScript. Prefixo 'gd'. */
+  .gdconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:gdDash 1.1s linear infinite}
+  .gdloop{stroke:var(--gold);stroke-width:2.5;fill:none;stroke-dasharray:6 6;animation:gdLoop 1.1s linear infinite}
+  .gdleaf{transition:transform .16s ease;cursor:default}
+  .gdleaf:hover{transform:translateX(3px)}
+  #gdPulse{animation:gdPulse 2.4s ease-in-out infinite}
+  @keyframes gdDash{to{stroke-dashoffset:-26}}
+  @keyframes gdLoop{to{stroke-dashoffset:26}}
+  @keyframes gdPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.gdconn,.gdloop,#gdPulse{animation:none}}
+  @media print{.gdconn,.gdloop,#gdPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 660 440" role="img" aria-labelledby="gdtitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="gdtitle">Fluxo de decisão dos guardrails: entrada (passa ou bloqueia, sem reprompt) → modelo (envolto pelo Bedrock Guardrails) → saída (passa, reprompt em laço, ou esgota), com a autorização por fora de tudo</title>
+    <defs>
+      <filter id="gdShadow" x="-8%" y="-12%" width="116%" height="130%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/>
+      </filter>
+    </defs>
+
+    <!-- Moldura: AUTORIZAÇÃO por fora de tudo -->
+    <rect x="6" y="6" width="648" height="428" rx="14" style="fill:none;stroke:var(--warn);stroke-width:1.4;stroke-dasharray:3 5"/>
+    <text x="20" y="26" style="fill:var(--warn);font-size:10.5px;font-weight:700">AUTORIZAÇÃO por fora — IAM (bedrock:InvokeModel) + código determinístico · guardrail ≠ autz</text>
+
+    <!-- entrada -->
+    <g class="gdleaf"><rect x="200" y="40" width="200" height="32" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#gdShadow)"/>
+      <text x="300" y="61" text-anchor="middle" style="fill:var(--accent);font-size:11.5px;font-weight:700">entrada do usuário</text></g>
+    <path class="gdconn" d="M300 72 L300 92"/><path d="M294 92 L306 92 L300 98 Z" style="fill:var(--accent)"/>
+
+    <!-- DECISÃO 1: InputGuardrail (2 saídas) -->
+    <polygon points="300,92 392,128 300,164 208,128" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#gdShadow)"/>
+    <text x="300" y="124" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">InputGuardrail</text>
+    <text x="300" y="139" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">validate(UserMessage)</text>
+
+    <!-- input → bloqueia (sem reprompt) -->
+    <text x="396" y="118" style="fill:var(--warn);font-size:9px;font-weight:700">failure / fatal</text>
+    <path class="gdconn" d="M392 128 L444 128"/><path d="M444 122 L444 134 L450 128 Z" style="fill:var(--warn)"/>
+    <g class="gdleaf"><rect x="448" y="104" width="196" height="48" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#gdShadow)"/>
+      <text x="462" y="124" style="fill:var(--warn);font-size:10.5px;font-weight:700">BLOQUEIA — GuardrailException</text>
+      <text x="462" y="140" style="fill:var(--muted);font-size:9px">impacto: sem reprompt; encerra</text></g>
+
+    <!-- input → passa -->
+    <text x="262" y="184" style="fill:var(--accent);font-size:9px;font-weight:700">success</text>
+    <path class="gdconn" d="M300 164 L300 186"/><path d="M294 186 L306 186 L300 192 Z" style="fill:var(--accent)"/>
+
+    <!-- MODELO, envolto pelo Bedrock Guardrails (provedor) -->
+    <rect x="158" y="186" width="284" height="58" rx="11" style="fill:none;stroke:var(--gold);stroke-width:1.6;stroke-dasharray:4 4"/>
+    <text x="300" y="201" text-anchor="middle" style="fill:var(--gold);font-size:9px;font-weight:700">⟵ Bedrock Guardrails (provedor, in-band)</text>
+    <g class="gdleaf"><rect x="178" y="206" width="244" height="32" rx="10" style="fill:var(--accent)" filter="url(#gdShadow)"/>
+      <text x="300" y="227" text-anchor="middle" style="fill:#fff;font-size:11.5px;font-weight:700">modelo (BedrockChatModel)</text></g>
+    <path class="gdconn" d="M300 244 L300 266"/><path d="M294 266 L306 266 L300 272 Z" style="fill:var(--accent)"/>
+
+    <!-- DECISÃO 2: OutputGuardrail (3 saídas) -->
+    <polygon id="gdPulse" points="300,260 404,310 300,360 196,310" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="300,266 398,310 300,354 202,310" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#gdShadow)"/>
+    <text x="300" y="306" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">OutputGuardrail</text>
+    <text x="300" y="321" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">validate(AiMessage)</text>
+
+    <!-- output → passa -->
+    <text x="262" y="380" style="fill:var(--accent);font-size:9px;font-weight:700">success</text>
+    <path class="gdconn" d="M300 354 L300 378"/><path d="M294 378 L306 378 L300 384 Z" style="fill:var(--accent)"/>
+    <g class="gdleaf"><rect x="178" y="384" width="244" height="32" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#gdShadow)"/>
+      <text x="300" y="405" text-anchor="middle" style="fill:var(--accent);font-size:11px;font-weight:700">resposta entregue</text></g>
+
+    <!-- output → reprompt: LAÇO de volta ao modelo (limitado por maxRetries) -->
+    <text x="410" y="346" style="fill:var(--gold);font-size:9px;font-weight:700">reprompt / retry</text>
+    <path class="gdloop" d="M398 310 C432 330 432 222 422 222"/><path d="M430 216 L418 222 L430 228 Z" style="fill:var(--gold)"/>
+    <g class="gdleaf"><rect x="448" y="252" width="196" height="48" rx="10" style="fill:var(--gold)" filter="url(#gdShadow)"/>
+      <text x="462" y="272" style="fill:#fff;font-size:10.5px;font-weight:700">LAÇO — re-invoca o modelo</text>
+      <text x="462" y="288" style="fill:#fff;font-size:9px;opacity:.85">impacto: maxRetries 2 → 1 reprompt</text></g>
+
+    <!-- output → esgotou -->
+    <text x="146" y="334" style="fill:var(--warn);font-size:9px;font-weight:700">esgotou</text>
+    <path class="gdconn" d="M202 310 C140 310 92 310 92 356 L92 384" style="stroke:var(--warn)"/><path d="M86 384 L98 384 L92 390 Z" style="fill:var(--warn)"/>
+    <g class="gdleaf"><rect x="12" y="384" width="160" height="48" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#gdShadow)"/>
+      <text x="26" y="404" style="fill:var(--warn);font-size:10px;font-weight:700">OutputGuardrailException</text>
+      <text x="26" y="420" style="fill:var(--muted);font-size:9px">impacto: estourou</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — O fluxo dos guardrails como decisões. A <strong>entrada</strong> tem <strong>2</strong> saídas (passa · bloqueia — <strong>sem reprompt</strong>, §2); a <strong>saída</strong> tem <strong>3</strong> (passa · <strong>laço de reprompt</strong> de volta ao modelo, limitado por <code>maxRetries</code> · esgota). O <strong>Bedrock Guardrails</strong> envolve o modelo no lado do provedor; e a <strong>autorização</strong> (IAM + código determinístico) fica <strong>por fora de tudo</strong> — <strong>impacto: guardrail ≠ autorização</strong> (§5).</figcaption>
+  </figure>
+
   <h2>5 · A fronteira que ancora tudo: guardrail ≠ autorização</h2>
   <blockquote class="insight">
     <p><span class="star">★ Insight —</span> <strong>Guardrails (as duas camadas) são defesa probabilística, NUNCA a camada de autorização.</strong> Onde a API mostra isso: o Javadoc do <code>@InputGuardrails</code> diz <em>"It does not replace a moderation model"</em>; o <code>GuardrailAssessment</code> expõe <strong>flags</strong> (<code>BLOCKED</code>/<code>ANONYMIZED</code>), não allow/deny; e o <code>ProcessingMode.ASYNC</code> <strong>libera tokens antes</strong> de terminar a avaliação — prova de que é <em>best-effort</em>. A autorização real é <strong>IAM</strong> (<code>bedrock:InvokeModel</code>, condição <code>bedrock:GuardrailIdentifier</code>) <strong>+ a sua autorização de negócio no código</strong> (Lição 1; filtro forçado pelo servidor da Lição 9). Guardrail reduz risco residual; <strong>não substitui</strong> controle de acesso.</p>

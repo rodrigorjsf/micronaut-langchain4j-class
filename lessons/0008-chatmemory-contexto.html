@@ -104,6 +104,60 @@
 
   <h2>4 · Prompt caching: a alavanca contra o N²</h2>
   <p>Fato verificado (fonte 1.16.2 + docs AWS): no Bedrock, a <strong>leitura</strong> de cache é muito mais barata. A doc do <code>langchain4j-bedrock</code>/AWS cita números <strong>ilustrativos</strong> — até <strong>~90%</strong> de economia no custo de leitura e <strong>~85%</strong> menos latência —, mas o ganho real <strong>depende da taxa de reúso e da carga</strong>: meça no seu caso, não trate como garantia. A <strong>escrita</strong> pode custar <strong>mais</strong> que entrada normal — só compensa com reúso frequente dentro do TTL. O mínimo cacheável <strong>varia por modelo</strong>: <strong>4.096 tokens</strong> no Sonnet 4.5, <strong>1.024</strong> no Sonnet 4.6. Máximo de <strong>4 checkpoints</strong> por requisição. O bloco fixo de ~6K reenviado a todo turno é o candidato perfeito.</p>
+  <style>
+  /* Decisão de prompt caching L8 (escopado; NÃO é o primeiro style do documento). Anima por CSS. */
+  .pcconn{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:7 6;animation:pcDash 1.1s linear infinite}
+  .pcleaf{transition:transform .16s ease;cursor:default}
+  .pcleaf:hover{transform:translateX(3px)}
+  #pcPulse{animation:pcPulse 2.4s ease-in-out infinite}
+  @keyframes pcDash{to{stroke-dashoffset:-26}}
+  @keyframes pcPulse{0%,100%{opacity:.22}50%{opacity:.95}}
+  @media (prefers-reduced-motion:reduce){.pcconn,#pcPulse{animation:none}}
+  @media print{.pcconn,#pcPulse{animation:none}}
+  </style>
+  <figure style="margin:1.5rem 0">
+  <svg viewBox="0 0 690 340" role="img" aria-labelledby="pctitle" style="width:100%;height:auto;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <title id="pctitle">Decisão de prompt caching: o prefixo fixo é cacheável? Se o prefixo for estável e atingir o mínimo do modelo, a leitura cai a ~0,1× a cada turno; caso contrário, cache miss ou nada cacheado — com o impacto de cada caminho</title>
+    <defs><filter id="pcShadow" x="-8%" y="-12%" width="116%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1a1a18" flood-opacity="0.15"/></filter></defs>
+
+    <g class="pcleaf"><rect x="40" y="14" width="270" height="46" rx="10" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3" filter="url(#pcShadow)"/>
+      <text x="175" y="34" text-anchor="middle" style="fill:var(--accent);font-size:11px;font-weight:700">Prefixo fixo a cada turno: tools + system (~6K)</text>
+      <text x="175" y="50" text-anchor="middle" style="fill:var(--muted);font-size:9.5px">ordem de render: tools → system → messages</text></g>
+    <path class="pcconn" d="M175 60 L175 84"/><path d="M169 84 L181 84 L175 90 Z" style="fill:var(--accent)"/>
+
+    <polygon id="pcPulse" points="175,84 286,138 175,192 64,138" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <polygon points="175,90 280,138 175,186 70,138" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#pcShadow)"/>
+    <text x="175" y="136" text-anchor="middle" style="fill:var(--ink);font-size:11.5px;font-weight:700">Prefixo estável?</text>
+    <text x="175" y="152" text-anchor="middle" style="fill:var(--muted);font-size:9px">sem timestamp/UUID</text>
+
+    <text x="288" y="100" style="fill:var(--muted);font-size:9px">não</text>
+    <path class="pcconn" d="M280 138 C326 138 332 80 366 80"/><path d="M366 74 L366 86 L372 80 Z" style="fill:var(--accent)"/>
+    <g class="pcleaf"><rect x="370" y="56" width="304" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#pcShadow)"/>
+      <text x="386" y="82" style="fill:var(--warn);font-size:11px;font-weight:700">CACHE MISS — prefixo mudou</text>
+      <text x="386" y="98" style="fill:var(--muted);font-size:9.5px">impacto: invalida o prefixo; paga escrita à toa</text></g>
+
+    <text x="200" y="216" style="fill:var(--gold);font-size:9px;font-weight:700">sim</text>
+    <path class="pcconn" d="M175 192 L175 222"/><path d="M169 222 L181 222 L175 228 Z" style="fill:var(--accent)"/>
+
+    <polygon points="175,228 280,276 175,324 70,276" style="fill:#fff;stroke:var(--accent);stroke-width:1.5" filter="url(#pcShadow)"/>
+    <text x="175" y="274" text-anchor="middle" style="fill:var(--ink);font-size:11px;font-weight:700">≥ mínimo do modelo?</text>
+    <text x="175" y="290" text-anchor="middle" style="fill:var(--muted);font-size:9px">4096 S4.5 / 1024 S4.6</text>
+
+    <text x="288" y="252" style="fill:var(--muted);font-size:9px">não</text>
+    <path class="pcconn" d="M280 276 C326 276 332 236 366 236"/><path d="M366 230 L366 242 L372 236 Z" style="fill:var(--accent)"/>
+    <g class="pcleaf"><rect x="370" y="212" width="304" height="52" rx="10" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.2" filter="url(#pcShadow)"/>
+      <text x="386" y="238" style="fill:var(--warn);font-size:11px;font-weight:700">NÃO CACHEIA — abaixo do mínimo</text>
+      <text x="386" y="254" style="fill:var(--muted);font-size:9.5px">impacto: cacheReadInputTokens() = 0</text></g>
+
+    <text x="288" y="304" style="fill:var(--gold);font-size:9px;font-weight:700">sim</text>
+    <path class="pcconn" d="M280 276 C326 276 332 312 366 312"/><path d="M366 306 L366 318 L372 312 Z" style="fill:var(--accent)"/>
+    <g class="pcleaf"><rect x="370" y="288" width="304" height="52" rx="10" style="fill:var(--gold)" filter="url(#pcShadow)"/>
+      <text x="386" y="314" style="fill:#fff;font-size:11px;font-weight:700">CACHE HIT — a alavanca contra o N²</text>
+      <text x="386" y="330" style="fill:#fff;font-size:9.5px;opacity:.85">impacto: leitura ~0,1× no prefixo, todo turno</text></g>
+  </svg>
+  <figcaption style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Figura — A decisão <strong>cacheável?</strong> e o seu <strong>impacto</strong>: prefixo <strong>estável</strong> (sem timestamp/UUID) <strong>e</strong> ≥ mínimo do modelo → <strong>HIT</strong>, que lê o prefixo a ~0,1× a cada turno; um único byte volátil derruba tudo (<strong>miss</strong>); abaixo do mínimo, <code>cacheReadInputTokens()</code> fica em zero.</figcaption>
+  </figure>
+
   <div class="warn">
     <strong>Regra de ouro (prefix match):</strong> o cache casa por <strong>prefixo</strong> — qualquer byte alterado invalida o resto. Ordem de render: <code>tools → system → messages</code>. No Bedrock você marca um <strong>cachePoint explícito</strong> (ex.: <code>AFTER_SYSTEM</code>): tudo <em>antes</em> dele é cacheado — então ponha o <strong>estável primeiro</strong> (system congelado, tools determinísticas) e o <strong>volátil depois</strong> (a conversa). <strong>Nunca</strong> injete timestamp/UUID/"data de hoje" no system prompt — invalida o cache a cada requisição.
   </div>
